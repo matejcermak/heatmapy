@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Mapy + Strava Heatmap Planner</title>
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+      crossorigin=""
+    />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <h1>Trip Planner</h1>
+        <p class="subtitle">Mapy-like planning with Strava heatmap overlay</p>
+
+        <section class="panel">
+          <h2>Map Layers</h2>
+          <label>
+            Base style
+            <select id="base-style">
+              <option value="outdoor" selected>Outdoor</option>
+              <option value="aerial">Aerial</option>
+              <option value="winter">Winter</option>
+            </select>
+          </label>
+          <label class="toggle-row">
+            <input type="checkbox" id="toggle-poi" checked />
+            Points of interest
+          </label>
+          <label class="toggle-row">
+            <input type="checkbox" id="toggle-contours" />
+            Contours
+          </label>
+          <label class="toggle-row">
+            <input type="checkbox" id="toggle-traffic" />
+            Traffic (simulated)
+          </label>
+        </section>
+
+        <section class="panel">
+          <h2>Strava Heatmap</h2>
+          <label class="toggle-row">
+            <input type="checkbox" id="toggle-heatmap" checked />
+            Show heatmap overlay
+          </label>
+          <label>
+            Sport type
+            <select id="heatmap-sport">
+              <option value="ride" selected>Cycling</option>
+              <option value="run">Running</option>
+              <option value="water">Water sports</option>
+              <option value="winter">Winter sports</option>
+              <option value="all">All activities</option>
+            </select>
+          </label>
+          <label>
+            Color ramp
+            <select id="heatmap-style">
+              <option value="hot" selected>Hot</option>
+              <option value="blue">Blue</option>
+              <option value="purple">Purple</option>
+              <option value="gray">Gray</option>
+            </select>
+          </label>
+          <label>
+            Opacity
+            <input
+              type="range"
+              id="heatmap-opacity"
+              min="0"
+              max="100"
+              value="55"
+            />
+          </label>
+          <p class="hint">
+            If tiles are blocked, sign in to Strava in this browser or use your
+            personal tile query string in <code>app.js</code>.
+          </p>
+        </section>
+
+        <section class="panel">
+          <h2>Route Planner</h2>
+          <p class="hint">
+            Click on map to add route points. This simulates common planning
+            functions.
+          </p>
+          <div class="planner-actions">
+            <button id="undo-point" type="button">Undo point</button>
+            <button id="clear-route" type="button">Clear route</button>
+          </div>
+          <div class="stats">
+            <div><strong>Points:</strong> <span id="stat-points">0</span></div>
+            <div>
+              <strong>Distance:</strong> <span id="stat-distance">0.0 km</span>
+            </div>
+            <div><strong>Status:</strong> <span id="sync-status">Idle</span></div>
+          </div>
+        </section>
+      </aside>
+
+      <main class="map-container">
+        <div id="map"></div>
+      </main>
+    </div>
+
+    <script
+      src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+      integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+      crossorigin=""
+    ></script>
+    <script src="./app.js"></script>
+  </body>
+</html>

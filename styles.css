@@ -1,0 +1,131 @@
+:root {
+  color-scheme: light;
+  font-family: Inter, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  color: #1f2937;
+  background: #f3f4f6;
+}
+
+.app-shell {
+  display: flex;
+  height: 100vh;
+  width: 100vw;
+}
+
+.sidebar {
+  width: 360px;
+  overflow-y: auto;
+  padding: 18px;
+  border-right: 1px solid #d1d5db;
+  background: #ffffff;
+}
+
+h1 {
+  margin: 0;
+  font-size: 1.35rem;
+}
+
+.subtitle {
+  margin: 6px 0 14px;
+  color: #4b5563;
+  font-size: 0.92rem;
+}
+
+.panel {
+  margin: 0 0 14px;
+  padding: 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #f9fafb;
+}
+
+.panel h2 {
+  margin: 0 0 10px;
+  font-size: 1rem;
+}
+
+label {
+  display: block;
+  margin: 8px 0;
+  font-size: 0.92rem;
+}
+
+select,
+button,
+input[type="range"] {
+  width: 100%;
+  margin-top: 4px;
+}
+
+.toggle-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.toggle-row input {
+  width: auto;
+  margin-top: 0;
+}
+
+.hint {
+  margin: 8px 0 0;
+  color: #6b7280;
+  font-size: 0.82rem;
+  line-height: 1.35;
+}
+
+.planner-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+button {
+  padding: 8px 10px;
+  border: 1px solid #9ca3af;
+  border-radius: 8px;
+  cursor: pointer;
+  background: #ffffff;
+}
+
+button:hover {
+  background: #f3f4f6;
+}
+
+.stats {
+  margin-top: 12px;
+  display: grid;
+  gap: 6px;
+  font-size: 0.9rem;
+}
+
+.map-container {
+  flex: 1;
+  min-width: 0;
+}
+
+#map {
+  width: 100%;
+  height: 100%;
+}
+
+.route-point {
+  background: #065f46;
+  color: #fff;
+  border-radius: 50%;
+  width: 18px;
+  height: 18px;
+  line-height: 18px;
+  text-align: center;
+  font-size: 0.72rem;
+  border: 1px solid #ecfeff;
+}
