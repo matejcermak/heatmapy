@@ -22,6 +22,7 @@
         gColor: "hot",
         gOpacity: 100,
     };
+    let lastNonMobileBlueColor = FILTERS.gColor;
 
     // Update this query string if Strava tiles require your signed auth params.
     // Example: "?Key-Pair-Id=...&Policy=...&Signature=..."
@@ -61,6 +62,7 @@
     const COLOR_ALIAS = {
         hot: "hot",
         blue: "blue",
+        mobileblue: "mobileblue",
         purple: "purple",
         gray: "gray",
         grey: "gray",
@@ -359,9 +361,9 @@
     }
 
     function getColorCandidates() {
-        // Always stick to hot; Strava commonly supports it and it matches the
-        // requested behavior (gColor=hot).
-        return ["hot"];
+        const key = String(FILTERS.gColor || "").toLowerCase();
+        const primary = COLOR_ALIAS[key] || "hot";
+        return [primary];
     }
 
     function getTileUrlCandidates(z, x, y) {
@@ -605,7 +607,7 @@
             `enabled=${overlayEnabled} debug=${debugEnabled} seq=${renderSeq}`,
             `state=${state ? `${state.zoom.toFixed(3)} / ${state.lat.toFixed(5)} / ${state.lon.toFixed(5)}` : "null"}`,
             `viewport=${window.innerWidth}x${window.innerHeight} mapRect=${Math.round(mapRect.width)}x${Math.round(mapRect.height)}@${Math.round(mapRect.left)},${Math.round(mapRect.top)}`,
-            `filters sport=${String(FILTERS.sport)} tileSport=${getSportSlug()} color=hot opacity=${FILTERS.gOpacity}`,
+            `filters sport=${String(FILTERS.sport)} tileSport=${getSportSlug()} color=${String(FILTERS.gColor)} opacity=${FILTERS.gOpacity}`,
             `tileZoomPolicy maxTileZoom=${MAX_PUBLIC_TILE_ZOOM} (always capped)`,
             [authStatus, authAge].filter(Boolean).join(" "),
             `tiles created=${debugStats.tilesCreated} loaded=${debugStats.tilesLoaded} errored=${debugStats.tilesErrored}`,
@@ -715,6 +717,7 @@
             Math.round(mapRect.top),
             overlayEnabled ? "1" : "0",
             FILTERS.sport,
+            FILTERS.gColor,
             FILTERS.gOpacity,
             getActiveAuthQuery(),
         ].join("|");
@@ -847,6 +850,21 @@
                 // Force a redraw even if map state didn't change.
                 lastStateKey = "";
                 updateDebugPanel(`sport toggled to ${FILTERS.sport}`);
+                requestRender();
+                return;
+            }
+            if (key.toLowerCase() === "j") {
+                consume();
+                const current = String(FILTERS.gColor || "hot");
+                if (current.toLowerCase() === "mobileblue") {
+                    FILTERS.gColor = lastNonMobileBlueColor || "hot";
+                } else {
+                    lastNonMobileBlueColor = current || "hot";
+                    FILTERS.gColor = "mobileblue";
+                }
+                // Force a redraw even if map state didn't change.
+                lastStateKey = "";
+                updateDebugPanel(`color toggled to ${FILTERS.gColor}`);
                 requestRender();
                 return;
             }
