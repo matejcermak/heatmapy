@@ -29,7 +29,8 @@
 
     const TILE_SUBDOMAINS = ["a", "b", "c"];
     const MIN_ZOOM = 0;
-    const MAX_ZOOM = 16;
+    // Mapy can go beyond 16; keep this high so scaling stays correct.
+    const MAX_ZOOM = 22;
     // Strava heatmap tiles are available only up to this zoom level (z=11).
     // Always request tiles at or below this zoom and scale them up for higher
     // Mapy zooms.
@@ -301,41 +302,45 @@
 
     function parseMapyState() {
         const url = new URL(window.location.href);
-        let zoom = Number(url.searchParams.get("z"));
-        let lat = Number(url.searchParams.get("y"));
-        let lon = Number(url.searchParams.get("x"));
-
-        if (
-            Number.isFinite(zoom) &&
-            Number.isFinite(lat) &&
-            Number.isFinite(lon)
-        ) {
-            return { zoom, lat, lon };
-        }
-
         const hash = window.location.hash.replace(/^#/, "");
+        const candidates = [];
+
+        const decimalDigits = (text) => {
+            const m = String(text || "").match(/\.(\d+)/);
+            return m ? m[1].length : 0;
+        };
+
+        const addCandidate = (zoomText, latText, lonText) => {
+            const zoom = Number(zoomText);
+            const lat = Number(latText);
+            const lon = Number(lonText);
+            if (!Number.isFinite(zoom) || !Number.isFinite(lat) || !Number.isFinite(lon)) {
+                return;
+            }
+            const precisionScore =
+                decimalDigits(zoomText) + decimalDigits(latText) + decimalDigits(lonText);
+            candidates.push({ zoom, lat, lon, precisionScore });
+        };
+
+        // Query params: ?x=...&y=...&z=...
+        addCandidate(url.searchParams.get("z"), url.searchParams.get("y"), url.searchParams.get("x"));
 
         // Pattern A: #12.83/49.99098/14.43104
         const slashParts = hash.split("/");
         if (slashParts.length >= 3) {
-            const zA = Number(slashParts[0]);
-            const latA = Number(slashParts[1]);
-            const lonA = Number(slashParts[2]);
-            if (Number.isFinite(zA) && Number.isFinite(latA) && Number.isFinite(lonA)) {
-                return { zoom: zA, lat: latA, lon: lonA };
-            }
+            addCandidate(slashParts[0], slashParts[1], slashParts[2]);
         }
 
         // Pattern B: #x=14.43104&y=49.99098&z=12.83
         const hashParams = new URLSearchParams(hash);
-        zoom = Number(hashParams.get("z"));
-        lat = Number(hashParams.get("y"));
-        lon = Number(hashParams.get("x"));
-        if (Number.isFinite(zoom) && Number.isFinite(lat) && Number.isFinite(lon)) {
-            return { zoom, lat, lon };
-        }
+        addCandidate(hashParams.get("z"), hashParams.get("y"), hashParams.get("x"));
 
-        return null;
+        if (!candidates.length) {
+            return null;
+        }
+        candidates.sort((a, b) => b.precisionScore - a.precisionScore);
+        const best = candidates[0];
+        return { zoom: best.zoom, lat: best.lat, lon: best.lon };
     }
 
     function lonToTileX(lon, zoom) {
@@ -540,10 +545,12 @@
 
         // Reposition the overlay to match the actual map viewport.
         const rect = getMapViewportRect();
-        overlayRoot.style.left = `${Math.round(rect.left)}px`;
-        overlayRoot.style.top = `${Math.round(rect.top)}px`;
-        overlayRoot.style.width = `${Math.round(rect.width)}px`;
-        overlayRoot.style.height = `${Math.round(rect.height)}px`;
+        // Don't round here: at high zoom even a 1px rounding error becomes
+        // noticeable and can appear to "drift" when Mapy pans/animates.
+        overlayRoot.style.left = `${rect.left}px`;
+        overlayRoot.style.top = `${rect.top}px`;
+        overlayRoot.style.width = `${rect.width}px`;
+        overlayRoot.style.height = `${rect.height}px`;
 
         if (!tileLayer) {
             tileLayer = document.createElement("div");
