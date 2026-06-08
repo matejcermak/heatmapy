@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Mapy + Strava Heatmap Overlay
 // @namespace    mapy-strava-overlay
-// @version      0.10.0
+// @version      0.11.0
 // @description  Overlay Strava global heatmap or Waymarked Trails MTB/road route layers on mapy.com, switchable, while keeping Mapy controls.
 // @downloadURL  https://github.com/matejcermak/mapycz_strava/raw/refs/heads/main/mapy_strava_overlay.user.js
 // @updateURL    https://github.com/matejcermak/mapycz_strava/raw/refs/heads/main/mapy_strava_overlay.user.js
@@ -43,11 +43,10 @@
     let personalOn = false;
     let lastBikeSport = "mtb";    // "mtb" | "road"
     const GLOBAL_HEAT_COLOR = "hot";
-    const PERSONAL_HEAT_COLOR = "blue"; // label only; tiles fetched grayscale + tinted
-    // The personal endpoint returns opaque-black "empty" tiles for color=blue
-    // (black boxes), but grayscale tiles are transparent where you have no
-    // activity. So we fetch grayscale and tint it blue with this CSS filter.
-    const PERSONAL_TINT_FILTER = "sepia(1) saturate(6) hue-rotate(185deg) brightness(1.15)";
+    // Personal tiles are fetched grayscale and recolored per-pixel to blue with a
+    // transparent background (the personal endpoint returns opaque-black tiles
+    // regardless of color). See recolorHeatTileToBlue / PERSONAL_RGB.
+    const PERSONAL_HEAT_COLOR = "blue"; // label only
     const BIKE_SPORT_TOKEN = {
         mtb: "sport_MountainBikeRide",
         road: "sport_Ride",
@@ -1338,12 +1337,13 @@
     function getLayerFetchPlan(layer, z, x, y) {
         const sportToken = BIKE_SPORT_TOKEN[layer.sport] || BIKE_SPORT_TOKEN.mtb;
         if (layer.kind === "personal") {
-            // grayscale = transparent where you have no activity; tinted blue via
-            // PERSONAL_TINT_FILTER. (color=blue here returns opaque-black empties.)
+            // Personal tiles arrive as opaque-black backgrounds with grayscale
+            // heat; recolor at render (key black -> transparent, heat -> blue).
             return {
                 urls: [buildPersonalHeatUrl(sportToken, "grayscale", z, x, y)],
                 needsCookies: true,
                 persist: false, // personal heat changes often -> session-cache only
+                recolor: true,
             };
         }
         // Global: "hot" as requested, with a grayscale fallback per tile in case
@@ -1516,6 +1516,60 @@
         })();
     }
 
+    // Personal heat tiles come back as an opaque BLACK background with grayscale
+    // heat painted on top. Convert to a transparent-background blue overlay:
+    // alpha = heat intensity, rgb = fixed blue. Returns an object URL (or "").
+    const PERSONAL_RGB = [40, 130, 255];
+    function recolorHeatTileToBlue(blob) {
+        return new Promise((resolve) => {
+            let srcUrl = "";
+            const finish = (out) => {
+                if (srcUrl) {
+                    try {
+                        URL.revokeObjectURL(srcUrl);
+                    } catch (_) {
+                        // ignore
+                    }
+                }
+                resolve(out);
+            };
+            try {
+                srcUrl = URL.createObjectURL(blob);
+                const im = new Image();
+                im.onload = () => {
+                    try {
+                        const w = im.naturalWidth || 256;
+                        const h = im.naturalHeight || 256;
+                        const canvas = document.createElement("canvas");
+                        canvas.width = w;
+                        canvas.height = h;
+                        const ctx = canvas.getContext("2d");
+                        ctx.drawImage(im, 0, 0, w, h);
+                        const imageData = ctx.getImageData(0, 0, w, h);
+                        const d = imageData.data;
+                        for (let i = 0; i < d.length; i += 4) {
+                            const intensity = Math.max(d[i], d[i + 1], d[i + 2]);
+                            d[i] = PERSONAL_RGB[0];
+                            d[i + 1] = PERSONAL_RGB[1];
+                            d[i + 2] = PERSONAL_RGB[2];
+                            d[i + 3] = intensity; // black bg -> 0 (transparent)
+                        }
+                        ctx.putImageData(imageData, 0, 0);
+                        canvas.toBlob((outBlob) => {
+                            finish(outBlob ? URL.createObjectURL(outBlob) : "");
+                        }, "image/png");
+                    } catch (_) {
+                        finish("");
+                    }
+                };
+                im.onerror = () => finish("");
+                im.src = srcUrl;
+            } catch (_) {
+                finish("");
+            }
+        });
+    }
+
     function setTileSourceFromPlan(img, plan, tileRenderSeq) {
         // Track basic load/error behavior (useful when tiles fetch OK but don't render).
         debugStats.tilesCreated += 1;
@@ -1638,6 +1692,17 @@
                                 if (!debugStats.current.okUrl) {
                                     debugStats.current.okUrl = candidate;
                                 }
+                            }
+                            if (plan.recolor) {
+                                // Personal tiles: key black -> transparent, heat
+                                // -> blue, then cache + show the processed result.
+                                recolorHeatTileToBlue(blob).then((outUrl) => {
+                                    const finalUrl = outUrl || URL.createObjectURL(blob);
+                                    memCachePut(primary, finalUrl);
+                                    img.src = finalUrl;
+                                    updateDebugPanel();
+                                });
+                                return;
                             }
                             const blobUrl = URL.createObjectURL(blob);
                             // Cache under the canonical (primary) url so future
@@ -1783,7 +1848,6 @@
                 position: "absolute",
                 inset: "0",
                 overflow: "hidden",
-                filter: PERSONAL_TINT_FILTER, // tint grayscale personal tiles blue
             });
             // Appended after the global layer -> personal blue renders on top.
             overlayRoot.appendChild(personalTileLayer);
