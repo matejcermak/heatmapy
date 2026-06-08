@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Mapy + Strava Heatmap Overlay
 // @namespace    mapy-strava-overlay
-// @version      0.6.0
+// @version      0.7.0
 // @description  Overlay Strava global heatmap or Waymarked Trails MTB/road route layers on mapy.com, switchable, while keeping Mapy controls.
 // @downloadURL  https://github.com/matejcermak/mapycz_strava/raw/refs/heads/main/mapy_strava_overlay.user.js
 // @updateURL    https://github.com/matejcermak/mapycz_strava/raw/refs/heads/main/mapy_strava_overlay.user.js
@@ -28,18 +28,24 @@
 
     // Defaults copied from your Strava URL request.
     const FILTERS = {
-        sport: "MountainBikeRide",
-        // Color for the content.strava.com per-sport heatmap. "grayscale" is the
-        // one we know is valid (it's what the web app requests); M cycles others.
-        gColor: "grayscale",
         gOpacity: 100,
-        // SOURCES (cycled by J):
-        // "strava-road"   = content.strava.com per-sport heatmap, sport_Ride (road)
-        // "strava-mtb"    = content.strava.com per-sport heatmap, sport_MountainBikeRide
-        // "strava-gravel" = content.strava.com per-sport heatmap, sport_GravelRide
-        // "mtb-routes"    = Waymarked Trails MTB route overlay (OSM, hi-res to z18)
-        // "road-routes"   = Waymarked Trails cycling/road route overlay (OSM, z18)
-        source: "strava-mtb",
+    };
+
+    // --- Layer state --------------------------------------------------------
+    // J cycles the GLOBAL heatmap: MTB -> Road -> off  (color fixed "hot").
+    // K toggles the PERSONAL heatmap on/off            (color fixed "blue").
+    // The personal heatmap's sport follows the global selection (MTB global ->
+    // MTB personal, Road global -> Road personal); when the global heatmap is
+    // off it uses the last bike sport you looked at. Global + personal can be
+    // shown at the same time (personal blue overlaid on global hot).
+    let globalMode = "mtb";       // "mtb" | "road" | "off"
+    let personalOn = false;
+    let lastBikeSport = "mtb";    // "mtb" | "road"
+    const GLOBAL_HEAT_COLOR = "hot";
+    const PERSONAL_HEAT_COLOR = "blue";
+    const BIKE_SPORT_TOKEN = {
+        mtb: "sport_MountainBikeRide",
+        road: "sport_Ride",
     };
 
     // Update this query string if Strava tiles require your signed auth params.
@@ -68,14 +74,14 @@
     // the browser's .strava.com cookies ride along cross-origin from mapy.com.
     const CONTENT_HEAT_HOST = "content-a.strava.com";
     const CONTENT_HEAT_MAX_ZOOM = 15;
-    // grayscale is confirmed valid; the others are best-effort (fall back to
-    // grayscale per-tile if the chosen color 404s).
-    const CONTENT_HEAT_COLORS = ["grayscale", "hot", "bluered", "blue", "mobileblue", "purple"];
-    const STRAVA_CONTENT_SPORT = {
-        "strava-road": "sport_Ride",
-        "strava-mtb": "sport_MountainBikeRide",
-        "strava-gravel": "sport_GravelRide",
-    };
+
+    // --- Personal heatmap ---------------------------------------------------
+    // Fill this with a personal-heatmap tile URL from your DevTools (it carries
+    // your athlete id). Use placeholders {sport} {color} {z} {x} {y} where the
+    // tile coords / sport_* token / color appear, e.g.:
+    //   "https://personalized-heatmaps-external.strava.com/tiles/<ID>/{color}/{z}/{x}/{y}.png?filter_type={sport}&respect_privacy_zones=true&include_everyone=true&include_followers=true"
+    // Until set, the K (personal) layer stays off with a hint.
+    const PERSONAL_HEAT_URL_TEMPLATE = "";
 
     const SPORT_ALIAS = {
         all: "all",
@@ -109,7 +115,8 @@
 
     let overlayEnabled = true;
     let overlayRoot = null;
-    let tileLayer = null;
+    let globalTileLayer = null;
+    let personalTileLayer = null;
     let debugRoot = null;
     let debugEnabled = false;
     let rafId = null;
@@ -144,6 +151,8 @@
     };
 
     const STORAGE_KEY_SOURCE = "mapyStravaActiveSource";
+    const STORAGE_KEY_GLOBAL_MODE = "mapyStravaGlobalMode";
+    const STORAGE_KEY_PERSONAL_ON = "mapyStravaPersonalOn";
     const STORAGE_KEY_AUTH = "stravaHeatmapAuthQuery";
     const STORAGE_KEY_AUTH_TS = "stravaHeatmapAuthTimestamp";
     const STORAGE_KEY_MAPY_LAST_GPX_EXPORT_URL = "mapyLastGpxExportUrl";
@@ -997,9 +1006,11 @@
         authFailureCount += 1;
         if (authFailureCount >= AUTH_REFRESH_FAIL_THRESHOLD) {
             authFailureCount = 0;
-            // Cookies likely expired mid-session: mark stale and re-probe.
-            stravaCookieAuthOk = false;
-            probeStravaCookieAuth(true);
+            // Repeated 403s on heatmap tiles -> Strava cookies missing/expired.
+            showNotice(
+                "Strava heatmap tiles are 403ing.\n" +
+                "Open the Strava heatmap page (logged in) to refresh your cookies, then reload."
+            );
         }
     }
 
@@ -1258,48 +1269,26 @@
         return [primary];
     }
 
-    // Ordered list the J hotkey cycles through.
-    const SOURCES = [
-        "strava-road",
-        "strava-mtb",
-        "strava-gravel",
-        "mtb-routes",
-        "road-routes",
-    ];
-
-    function getActiveSource() {
-        const s = String(FILTERS.source || "strava-mtb").toLowerCase();
-        return SOURCES.includes(s) ? s : "strava-mtb";
+    function personalConfigured() {
+        return !!PERSONAL_HEAT_URL_TEMPLATE;
     }
 
-    function isWmtRouteSource(src) {
-        return src === "mtb-routes" || src === "road-routes";
-    }
-
-    function isStravaContentSource(src) {
-        return Object.prototype.hasOwnProperty.call(STRAVA_CONTENT_SPORT, src);
-    }
-
-    function getContentColor() {
-        const c = String(FILTERS.gColor || "grayscale").toLowerCase();
-        return CONTENT_HEAT_COLORS.includes(c) ? c : "grayscale";
-    }
-
-    // Try the chosen color first, then grayscale (known-valid) as a fallback.
-    function getContentColorCandidates() {
-        const chosen = getContentColor();
-        return chosen === "grayscale" ? ["grayscale"] : [chosen, "grayscale"];
-    }
-
-    function getMaxTileZoomForSource() {
-        const src = getActiveSource();
-        if (isWmtRouteSource(src)) {
-            return WMT_MAX_ZOOM;
+    // The tile layers active for the current toggle state, bottom-to-top
+    // (global hot underneath, personal blue on top).
+    function getActiveLayers() {
+        const layers = [];
+        if (globalMode !== "off") {
+            layers.push({ kind: "global", sport: globalMode });
         }
-        if (isStravaContentSource(src)) {
-            return CONTENT_HEAT_MAX_ZOOM;
+        if (personalOn && personalConfigured()) {
+            const sport = globalMode === "off" ? lastBikeSport : globalMode;
+            layers.push({ kind: "personal", sport });
         }
-        return stravaAuthAvailable() ? STRAVA_MAX_AUTH_ZOOM : STRAVA_MAX_PUBLIC_ZOOM;
+        return layers;
+    }
+
+    function getMaxTileZoom() {
+        return CONTENT_HEAT_MAX_ZOOM;
     }
 
     function buildStravaTileUrl(basePath, z, x, y, includeAuth) {
@@ -1318,6 +1307,41 @@
         const wrappedX = ((x % worldSize) + worldSize) % worldSize;
         return `https://${CONTENT_HEAT_HOST}/identified/globalheat/` +
             `${sportToken}/${color}/${z}/${wrappedX}/${y}.png?v=19&missing=empty`;
+    }
+
+    function buildPersonalHeatUrl(sportToken, color, z, x, y) {
+        if (!PERSONAL_HEAT_URL_TEMPLATE) {
+            return "";
+        }
+        const worldSize = Math.pow(2, z);
+        const wrappedX = ((x % worldSize) + worldSize) % worldSize;
+        return PERSONAL_HEAT_URL_TEMPLATE
+            .replace(/\{sport\}/g, sportToken)
+            .replace(/\{color\}/g, color)
+            .replace(/\{z\}/g, String(z))
+            .replace(/\{x\}/g, String(wrappedX))
+            .replace(/\{y\}/g, String(y));
+    }
+
+    // Fetch plan for one layer. Both global and personal heat are cookie-authed
+    // strava endpoints, so both go through the GM_xmlhttpRequest cookie path.
+    function getLayerFetchPlan(layer, z, x, y) {
+        const sportToken = BIKE_SPORT_TOKEN[layer.sport] || BIKE_SPORT_TOKEN.mtb;
+        if (layer.kind === "personal") {
+            return {
+                urls: [buildPersonalHeatUrl(sportToken, PERSONAL_HEAT_COLOR, z, x, y)],
+                needsCookies: true,
+            };
+        }
+        // Global: "hot" as requested, with a grayscale fallback per tile in case
+        // the endpoint doesn't serve that color.
+        return {
+            urls: [
+                buildContentHeatUrl(sportToken, GLOBAL_HEAT_COLOR, z, x, y),
+                buildContentHeatUrl(sportToken, "grayscale", z, x, y),
+            ],
+            needsCookies: true,
+        };
     }
 
     // theme: "mtb" (mountain bike routes) or "cycling" (road/touring cycle routes).
@@ -1566,15 +1590,26 @@
         overlayRoot.style.width = `${rect.width}px`;
         overlayRoot.style.height = `${rect.height}px`;
 
-        if (!tileLayer) {
-            tileLayer = document.createElement("div");
-            tileLayer.id = "mapy-strava-overlay-tiles";
-            Object.assign(tileLayer.style, {
+        if (!globalTileLayer) {
+            globalTileLayer = document.createElement("div");
+            globalTileLayer.id = "mapy-strava-overlay-tiles-global";
+            Object.assign(globalTileLayer.style, {
                 position: "absolute",
                 inset: "0",
                 overflow: "hidden",
             });
-            overlayRoot.appendChild(tileLayer);
+            overlayRoot.appendChild(globalTileLayer);
+        }
+        if (!personalTileLayer) {
+            personalTileLayer = document.createElement("div");
+            personalTileLayer.id = "mapy-strava-overlay-tiles-personal";
+            Object.assign(personalTileLayer.style, {
+                position: "absolute",
+                inset: "0",
+                overflow: "hidden",
+            });
+            // Appended after the global layer -> personal blue renders on top.
+            overlayRoot.appendChild(personalTileLayer);
         }
 
         if (!debugRoot) {
@@ -1619,8 +1654,8 @@
             `enabled=${overlayEnabled} debug=${debugEnabled} seq=${renderSeq}`,
             `state=${state ? `${state.zoom.toFixed(3)} / ${state.lat.toFixed(5)} / ${state.lon.toFixed(5)}` : "null"}`,
             `viewport=${window.innerWidth}x${window.innerHeight} mapRect=${Math.round(mapRect.width)}x${Math.round(mapRect.height)}@${Math.round(mapRect.left)},${Math.round(mapRect.top)}`,
-            `filters sport=${String(FILTERS.sport)} tileSport=${getSportSlug()} color=${String(FILTERS.gColor)} opacity=${FILTERS.gOpacity}`,
-            `source=${getActiveSource()} maxTileZoom=${getMaxTileZoomForSource()} (authQuery=${getActiveAuthQuery() ? "yes" : "no"} cookieAuth=${stravaCookieAuthOk ? "yes" : "no"} probing=${stravaCookieProbeInFlight ? "yes" : "no"})`,
+            `layers global=${globalMode} personal=${personalOn ? "on" : "off"} personalCfg=${personalConfigured() ? "yes" : "no"} activeSport=${globalMode === "off" ? lastBikeSport : globalMode}`,
+            `colors global=${GLOBAL_HEAT_COLOR} personal=${PERSONAL_HEAT_COLOR} maxZoom=${getMaxTileZoom()} opacity=${FILTERS.gOpacity}`,
             [authStatus, authAge].filter(Boolean).join(" "),
             `tiles created=${debugStats.tilesCreated} loaded=${debugStats.tilesLoaded} errored=${debugStats.tilesErrored}`,
             `gm ok=${debugStats.gmFetchedOk} fail=${debugStats.gmFetchedFail} last=${debugStats.lastGmStatus} prev=${debugStats.lastGmStatusBeforeExhausted}`,
@@ -1637,8 +1672,11 @@
     }
 
     function clearTiles() {
-        if (tileLayer) {
-            tileLayer.replaceChildren();
+        if (globalTileLayer) {
+            globalTileLayer.replaceChildren();
+        }
+        if (personalTileLayer) {
+            personalTileLayer.replaceChildren();
         }
     }
 
@@ -1663,21 +1701,9 @@
         const zoomFloat = clamp(state.zoom, MIN_ZOOM, MAX_ZOOM);
         const desiredTileZoom = Math.floor(zoomFloat);
 
-        // Per-source max zoom: Strava public z<=11, Strava auth z<=15, WMT MTB z<=18.
-        // Above the cap, scale fewer big tiles up; at or below it, request the
-        // matching native zoom for crispness.
-        const tileZoom = Math.min(desiredTileZoom, getMaxTileZoomForSource());
-
-        // If the user is zoomed past the public cap on Strava and we have no
-        // auth captured, we'd just be pixelated z=11 tiles. Try to grab auth
-        // in the background so the next render can use /tiles-auth/ at z>11.
-        if (
-            getActiveSource() === "strava-ride" &&
-            desiredTileZoom > STRAVA_MAX_PUBLIC_ZOOM &&
-            !stravaAuthAvailable()
-        ) {
-            probeStravaCookieAuth();
-        }
+        // Per-layer native zoom cap (content heatmap ~z15). Above the cap we
+        // scale big tiles up; at or below it we request the matching zoom.
+        const tileZoom = Math.min(desiredTileZoom, getMaxTileZoom());
 
         const scale = Math.pow(2, zoomFloat - tileZoom);
 
@@ -1697,37 +1723,40 @@
         clearTiles();
 
         const maxTileY = Math.pow(2, tileZoom) - 1;
+        const layers = getActiveLayers();
 
-        for (let ty = startY; ty <= endY; ty += 1) {
-            if (ty < 0 || ty > maxTileY) {
-                continue;
-            }
-            for (let tx = startX; tx <= endX; tx += 1) {
-                const img = document.createElement("img");
-                img.alt = "";
-                img.draggable = false;
-                Object.assign(img.style, {
-                    position: "absolute",
-                    left: `${(tx * 256 - topLeftPxX) * scale}px`,
-                    top: `${(ty * 256 - topLeftPxY) * scale}px`,
-                    width: `${256 * scale}px`,
-                    height: `${256 * scale}px`,
-                    imageRendering: "auto",
-                    userSelect: "none",
-                });
-                if (debugEnabled) {
-                    img.style.outline = "1px solid rgba(255,0,0,0.35)";
+        for (const layer of layers) {
+            const layerDiv = layer.kind === "personal" ? personalTileLayer : globalTileLayer;
+            for (let ty = startY; ty <= endY; ty += 1) {
+                if (ty < 0 || ty > maxTileY) {
+                    continue;
                 }
-                setTileSourceFromPlan(img, getTileFetchPlan(tileZoom, tx, ty), renderSeq);
-                tileLayer.appendChild(img);
+                for (let tx = startX; tx <= endX; tx += 1) {
+                    const img = document.createElement("img");
+                    img.alt = "";
+                    img.draggable = false;
+                    Object.assign(img.style, {
+                        position: "absolute",
+                        left: `${(tx * 256 - topLeftPxX) * scale}px`,
+                        top: `${(ty * 256 - topLeftPxY) * scale}px`,
+                        width: `${256 * scale}px`,
+                        height: `${256 * scale}px`,
+                        imageRendering: "auto",
+                        userSelect: "none",
+                    });
+                    if (debugEnabled) {
+                        img.style.outline = layer.kind === "personal"
+                            ? "1px solid rgba(0,128,255,0.35)"
+                            : "1px solid rgba(255,0,0,0.35)";
+                    }
+                    setTileSourceFromPlan(img, getLayerFetchPlan(layer, tileZoom, tx, ty), renderSeq);
+                    layerDiv.appendChild(img);
+                }
             }
         }
 
         if (overlayRoot) {
             overlayRoot.style.background = debugEnabled ? "rgba(255,0,255,0.04)" : "transparent";
-        }
-        if (tileLayer) {
-            tileLayer.style.outline = debugEnabled ? "2px solid rgba(0,255,255,0.35)" : "none";
         }
         updateDebugPanel();
     }
@@ -1743,10 +1772,10 @@
             Math.round(mapRect.left),
             Math.round(mapRect.top),
             overlayEnabled ? "1" : "0",
-            FILTERS.sport,
-            FILTERS.gColor,
+            globalMode,
+            personalOn ? "1" : "0",
+            lastBikeSport,
             FILTERS.gOpacity,
-            getActiveAuthQuery(),
         ].join("|");
     }
 
@@ -1934,31 +1963,43 @@
             }
             if (key.toLowerCase() === "j") {
                 consume();
-                const idx = SOURCES.indexOf(getActiveSource());
-                FILTERS.source = SOURCES[(idx + 1) % SOURCES.length];
-                gmSetValue(STORAGE_KEY_SOURCE, FILTERS.source);
+                const order = ["mtb", "road", "off"];
+                globalMode = order[(order.indexOf(globalMode) + 1) % order.length];
+                if (globalMode !== "off") {
+                    lastBikeSport = globalMode;
+                }
+                gmSetValue(STORAGE_KEY_GLOBAL_MODE, globalMode);
                 lastStateKey = "";
                 const labels = {
-                    "strava-road": `Strava heatmap — Road / sport_Ride, ${getContentColor()} (z≤${CONTENT_HEAT_MAX_ZOOM})`,
-                    "strava-mtb": `Strava heatmap — MTB / sport_MountainBikeRide, ${getContentColor()} (z≤${CONTENT_HEAT_MAX_ZOOM})`,
-                    "strava-gravel": `Strava heatmap — Gravel / sport_GravelRide, ${getContentColor()} (z≤${CONTENT_HEAT_MAX_ZOOM})`,
-                    "mtb-routes": "Waymarked Trails — MTB routes (z≤18)",
-                    "road-routes": "Waymarked Trails — road/cycling routes (z≤18)",
+                    mtb: "Global heatmap: MTB (hot)",
+                    road: "Global heatmap: Road (hot)",
+                    off: "Global heatmap: off",
                 };
-                showNotice(`Source: ${labels[FILTERS.source] || FILTERS.source}`);
-                updateDebugPanel(`source toggled to ${FILTERS.source}`);
+                showNotice(labels[globalMode]);
+                updateDebugPanel(`global -> ${globalMode}`);
                 requestRender();
                 return;
             }
-            if (key.toLowerCase() === "m") {
+            if (key.toLowerCase() === "k") {
                 consume();
-                // Cycle the per-sport heatmap color (grayscale is the safe default;
-                // the rest are best-effort and fall back to grayscale per tile).
-                const i = CONTENT_HEAT_COLORS.indexOf(getContentColor());
-                FILTERS.gColor = CONTENT_HEAT_COLORS[(i + 1) % CONTENT_HEAT_COLORS.length];
+                personalOn = !personalOn;
+                gmSetValue(STORAGE_KEY_PERSONAL_ON, personalOn ? "1" : "0");
                 lastStateKey = "";
-                showNotice(`Heatmap color: ${FILTERS.gColor}`);
-                updateDebugPanel(`color -> ${FILTERS.gColor}`);
+                if (personalOn && !personalConfigured()) {
+                    showNotice(
+                        "Personal heatmap not set up yet.\n" +
+                        "Open your Strava personal heatmap, copy a tile URL from the\n" +
+                        "Network tab, and add it to PERSONAL_HEAT_URL_TEMPLATE."
+                    );
+                } else {
+                    const sport = globalMode === "off" ? lastBikeSport : globalMode;
+                    showNotice(
+                        personalOn
+                            ? `Personal heatmap: ON — ${sport === "road" ? "Road" : "MTB"} (blue)`
+                            : "Personal heatmap: off"
+                    );
+                }
+                updateDebugPanel(`personal -> ${personalOn ? "on" : "off"}`);
                 requestRender();
                 return;
             }
@@ -2016,15 +2057,16 @@
             installRideWithGpsUpload();
             return;
         }
-        // Restore the last source picked with J so it survives reloads.
-        FILTERS.source = String(
-            gmGetValue(STORAGE_KEY_SOURCE, FILTERS.source) || FILTERS.source
-        ).toLowerCase();
+        // Restore J/K toggle state across reloads.
+        const savedGlobal = String(gmGetValue(STORAGE_KEY_GLOBAL_MODE, "mtb") || "mtb").toLowerCase();
+        globalMode = ["mtb", "road", "off"].includes(savedGlobal) ? savedGlobal : "mtb";
+        if (globalMode !== "off") {
+            lastBikeSport = globalMode;
+        }
+        personalOn = String(gmGetValue(STORAGE_KEY_PERSONAL_ON, "") || "") === "1";
         installObservers();
         installMapyExportCapture();
         installHotkeys();
-        // Probe cookie auth at startup so z>11 unlocks without any capture step.
-        probeStravaCookieAuth(true);
         requestRender();
     }
 

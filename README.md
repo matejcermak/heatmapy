@@ -24,34 +24,52 @@ This repo includes:
 
 ### Hotkeys
 
-- `H` — toggle overlay on/off
-- `J` — cycle tile **source** (remembered across reloads):
-  Strava **Road** heatmap → Strava **MTB** heatmap → Strava **Gravel** heatmap →
-  Waymarked Trails **MTB** routes → Waymarked Trails **road/cycling** routes.
-- `M` — cycle Strava heatmap **color**: grayscale → hot → bluered → blue →
-  mobileblue → purple (grayscale is the confirmed-valid default; others fall
-  back to grayscale per tile if a color isn't served).
+Two independent overlays — a **global** heatmap (`J`) and your **personal**
+heatmap (`K`) — that can be shown together (personal blue on top of global hot).
+
+- `H` — toggle the whole overlay on/off
+- `J` — cycle the **global** heatmap (remembered across reloads):
+  **MTB** (hot) → **Road** (hot) → **off**.
+- `K` — toggle your **personal** heatmap on/off (blue). Its sport follows `J`
+  (MTB global → MTB personal, Road global → Road personal); when global is off it
+  uses the last bike sport you looked at. Needs `PERSONAL_HEAT_URL_TEMPLATE` set
+  (see below).
 - `G` — toggle Mapy base map between aerial (satellite) and outdoor/tourist
 - `[` / `]` — decrease / increase opacity in 10% steps
 - `Alt + D` — toggle debug panel
 - `S` — export current Mapy planner route as GPX and open Ride with GPS upload
 - `P` — toggle Mapy panorama
 
+Colors are **fixed**: global heatmaps are `hot`, personal is `blue` (no color
+hotkey). Waymarked Trails route layers were removed.
+
 ### Tile sources
 
-| Source | URL pattern | Max zoom | Auth |
+| Layer | URL pattern | Max zoom | Auth |
 | --- | --- | --- | --- |
-| Strava per-sport heatmap | `content-a.strava.com/identified/globalheat/sport_{Ride,MountainBikeRide,GravelRide}/{color}/{z}/{x}/{y}.png?v=19&missing=empty` | ~15 | CloudFront **cookie** (your logged-in `.strava.com` cookies, sent via `GM_xmlhttpRequest`) |
-| Waymarked Trails MTB | `tile.waymarkedtrails.org/mtb/{z}/{x}/{y}.png` | 18 | none |
-| Waymarked Trails road/cycling | `tile.waymarkedtrails.org/cycling/{z}/{x}/{y}.png` | 18 | none |
+| Global per-sport heatmap (`J`) | `content-a.strava.com/identified/globalheat/sport_{MountainBikeRide,Ride}/hot/{z}/{x}/{y}.png?v=19&missing=empty` | ~15 | CloudFront **cookie** (logged-in `.strava.com`, via `GM_xmlhttpRequest`) |
+| Personal heatmap (`K`) | from `PERSONAL_HEAT_URL_TEMPLATE` (your account's tile URL) | — | CloudFront **cookie** |
 
-The **per-sport heatmap** is the endpoint the Strava web app itself uses, and —
-unlike the public `heatmap-external/.../ride/...` tiles — it **separates
-disciplines** (`sport_Ride` = road, `sport_MountainBikeRide`, `sport_GravelRide`).
-It authenticates by cookie, so the script fetches it through Tampermonkey
-(`@connect content-*.strava.com` + `strava.com`, `withCredentials`) and your
-browser attaches the `.strava.com` CloudFront cookies. No query-string signature
-or "capture" step is involved.
+The **global per-sport heatmap** is the endpoint the Strava web app itself uses,
+and — unlike the public `heatmap-external/.../ride/...` tiles — it **separates
+disciplines** (`sport_Ride` = road, `sport_MountainBikeRide`). It authenticates by
+cookie, fetched through Tampermonkey (`@connect content-*.strava.com` +
+`strava.com`, `withCredentials`) so the browser attaches your `.strava.com`
+cookies. No query-string signature or capture step is involved.
+
+### Personal heatmap setup
+
+The personal heatmap tile URL contains your account's athlete id, so it can't be
+hardcoded generically. To enable `K`:
+
+1. Open your personal heatmap on Strava (`https://www.strava.com/maps/personal-heatmap`),
+   logged in, and set the activity-type filter (e.g. Mountain Bike Ride).
+2. DevTools → Network, find a personal-heatmap tile request, copy its URL.
+3. Put it in `PERSONAL_HEAT_URL_TEMPLATE` near the top of the script, replacing
+   the tile coords / sport / color with placeholders `{z}` `{x}` `{y}` `{sport}`
+   `{color}` — e.g.
+   `https://personalized-heatmaps-external.strava.com/tiles/<ID>/{color}/{z}/{x}/{y}.png?filter_type={sport}&...`
+   (`{sport}` is the `sport_MountainBikeRide` / `sport_Ride` token; `{color}` is `blue`).
 
 ### Auth — it just needs your logged-in Strava cookies
 
