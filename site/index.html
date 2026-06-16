@@ -139,6 +139,23 @@
         font-size: 14px; text-align: center; padding: 14px; }
     .cmp-shot img { width: 100%; border-radius: var(--radius); border: 1px solid var(--line); box-shadow: var(--shadow); display: block; }
 
+    /* before/after compare slider */
+    .ba { position: relative; aspect-ratio: 18 / 10; border-radius: var(--radius); overflow: hidden;
+        border: 1px solid var(--line); box-shadow: var(--shadow); --pos: 50%; touch-action: none; user-select: none; }
+    .ba-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
+    .ba-top { clip-path: inset(0 calc(100% - var(--pos)) 0 0); }
+    .ba-range { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: ew-resize; }
+    .ba-handle { position: absolute; top: 0; bottom: 0; left: var(--pos); width: 3px; margin-left: -1.5px;
+        background: #fff; box-shadow: 0 0 0 1px rgba(0,0,0,0.12); pointer-events: none; }
+    .ba-handle::after { content: "↔"; position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
+        width: 36px; height: 36px; border-radius: 50%; background: var(--orange); color: #fff;
+        display: flex; align-items: center; justify-content: center; font-size: 18px; font-weight: 700;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.3); }
+    .ba-label { position: absolute; top: 12px; z-index: 2; pointer-events: none; padding: 4px 10px; border-radius: 999px;
+        font-size: 12px; font-weight: 700; color: #fff; backdrop-filter: blur(2px); }
+    .ba-label--l { left: 12px; background: rgba(30,144,255,0.92); }
+    .ba-label--r { right: 12px; background: rgba(252,82,0,0.92); }
+
     /* final cta */
     .final { text-align: center; }
     .final .badges { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin-top: 22px; }
@@ -283,8 +300,14 @@
                 <div class="cmp">
                     <h3>⛰️ See the terrain</h3>
                     <p>Gradient shading and contours tell you instantly whether it's hilly or flat, forest or open — Strava's base map stays flat and bare.</p>
-                    <!-- swap for: <img src="img/compare-terrain.png" alt="Mapy.com vs Strava terrain"> -->
-                    <div class="cmp-shot">Side-by-side screenshot — Mapy.com (left) vs Strava (right)</div>
+                    <div class="ba">
+                        <img class="ba-img" src="img/cmp-terrain-strava.png" alt="Same area on Strava">
+                        <img class="ba-img ba-top" src="img/cmp-terrain-mapy.png" alt="Same area on Mapy.com">
+                        <div class="ba-handle" aria-hidden="true"></div>
+                        <span class="ba-label ba-label--l">Mapy.com</span>
+                        <span class="ba-label ba-label--r">Strava</span>
+                        <input class="ba-range" type="range" min="0" max="100" value="50" aria-label="Drag to compare Mapy.com and Strava">
+                    </div>
                 </div>
                 <div class="cmp">
                     <h3>🛣️ Know the road before you ride it</h3>
@@ -295,8 +318,14 @@
                 <div class="cmp">
                     <h3>🛤️ Every path — and what's closed</h3>
                     <p>Every tiny trail in the middle of nowhere is on Mapy.com, with up-to-date closures. Strava's map misses the small stuff.</p>
-                    <!-- swap for: <img src="img/compare-paths.png" alt="Mapy.com vs Strava paths and closures"> -->
-                    <div class="cmp-shot">Side-by-side screenshot — Mapy.com (left) vs Strava (right)</div>
+                    <div class="ba">
+                        <img class="ba-img" src="img/cmp-paths-strava.png" alt="Same area on Strava">
+                        <img class="ba-img ba-top" src="img/cmp-paths-mapy.png" alt="Same area on Mapy.com">
+                        <div class="ba-handle" aria-hidden="true"></div>
+                        <span class="ba-label ba-label--l">Mapy.com</span>
+                        <span class="ba-label ba-label--r">Strava</span>
+                        <input class="ba-range" type="range" min="0" max="100" value="50" aria-label="Drag to compare Mapy.com and Strava">
+                    </div>
                 </div>
                 <div class="cmp">
                     <h3>🧭 Smarter route planning</h3>
@@ -332,6 +361,14 @@
     const STRIPE_URL = "https://donate.stripe.com/test_cNicN59mE2hg2ms8k84AU00";
     document.querySelectorAll('[data-cta="chrome"]').forEach((a) => { a.href = CHROME_URL; a.target = "_blank"; a.rel = "noopener"; });
     document.querySelectorAll('[data-cta="coffee"]').forEach((a) => { a.href = STRIPE_URL; a.target = "_blank"; a.rel = "noopener"; });
+
+    // before/after compare sliders
+    document.querySelectorAll('.ba-range').forEach((r) => {
+        const ba = r.closest('.ba');
+        const upd = () => ba.style.setProperty('--pos', r.value + '%');
+        r.addEventListener('input', upd);
+        upd();
+    });
 </script>
 </body>
 </html>
