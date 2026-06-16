@@ -174,18 +174,26 @@
     <!-- HERO -->
     <section class="hero">
         <div class="wrap">
-            <span class="eyebrow">● Free Chrome extension</span>
             <h1>Strava heat, on the map that's <span class="g">actually good at planning</span>.</h1>
             <p class="sub">Overlay your Strava global <b>and</b> personal heatmaps on <b>Mapy.com</b> — switch
                 MTB / Ride / Run, and spot the roads and trails you've never explored yet.</p>
             <div class="cta-row">
-                <a class="btn btn--chrome" href="#get" data-cta="chrome">
+                <a class="btn btn--chrome" href="#" data-cta="chrome">
                     <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 0 1 8.66 5H12a5 5 0 0 0-4.33 2.5L4.2 4.8A10 10 0 0 1 12 2Zm9.5 6.5A10 10 0 0 1 12 22l4.33-7.5A5 5 0 0 0 12 7h9.5ZM2.5 6.6 6.83 14A5 5 0 0 0 12 17l-1.7 5A10 10 0 0 1 2.5 6.6ZM12 9a3 3 0 1 1 0 6 3 3 0 0 1 0-6Z"/></svg>
-                    Get the Chrome Extension
+                    Get the Chrome Extension (Free)
                 </a>
-                <a class="btn btn--coffee" href="#get" data-cta="coffee">☕ Buy me a coffee · 50 Kč</a>
+                <a class="btn btn--coffee" href="#" data-cta="coffee">☕ Buy me a coffee</a>
+                <a class="btn btn--ghost" href="https://github.com/matejcermak/mapycz_strava" target="_blank" rel="noopener">
+                    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 1.5A10.5 10.5 0 0 0 8.7 22c.5.1.7-.2.7-.5v-1.7c-2.9.6-3.5-1.4-3.5-1.4-.5-1.2-1.2-1.5-1.2-1.5-.9-.6.1-.6.1-.6 1 .1 1.6 1 1.6 1 .9 1.6 2.4 1.1 3 .9.1-.7.4-1.1.6-1.4-2.3-.3-4.7-1.2-4.7-5.1 0-1.1.4-2 1-2.7-.1-.3-.5-1.3.1-2.7 0 0 .9-.3 2.8 1a9.6 9.6 0 0 1 5 0c1.9-1.3 2.8-1 2.8-1 .6 1.4.2 2.4.1 2.7.7.7 1 1.6 1 2.7 0 3.9-2.4 4.8-4.7 5.1.4.3.7.9.7 1.9v2.8c0 .3.2.6.7.5A10.5 10.5 0 0 0 12 1.5Z"/></svg>
+                    View on GitHub
+                </a>
             </div>
-            <p class="fineprint"><b>Free</b> &nbsp;·&nbsp; open source &nbsp;·&nbsp; no account needed to use the map</p>
+            <div class="maintain">
+                <span class="dot-pulse" aria-hidden="true"></span>
+                <span><b>Actively maintained.</b> I fix bugs and ship improvements regularly — hit one, or have an idea?
+                    <a href="https://github.com/matejcermak/mapycz_strava/issues" target="_blank" rel="noopener">Open a GitHub issue →</a></span>
+            </div>
+            <p class="fineprint">Open source · works in Chrome, Brave, Edge &amp; Opera · needs you logged in to Strava (Subscription for high-zoom &amp; personal heat)</p>
 
             <div class="video">
                 <img src="img/hero.png" alt="Strava heatmap overlaid on Mapy.com" />
@@ -249,31 +257,6 @@
         </div>
     </section>
 
-    <!-- GET -->
-    <section class="block soft final" id="get">
-        <div class="wrap">
-            <div class="kicker">Get it</div>
-            <h2>Install it, plan your next ride — for free</h2>
-            <p class="lead">One click to add it to Chrome. If it saves you time, a 50 Kč coffee keeps it alive.</p>
-            <div class="badges">
-                <a class="btn btn--chrome" href="#" data-cta="chrome" id="chromeLink">
-                    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 0 1 8.66 5H12a5 5 0 0 0-4.33 2.5L4.2 4.8A10 10 0 0 1 12 2Zm9.5 6.5A10 10 0 0 1 12 22l4.33-7.5A5 5 0 0 0 12 7h9.5ZM2.5 6.6 6.83 14A5 5 0 0 0 12 17l-1.7 5A10 10 0 0 1 2.5 6.6ZM12 9a3 3 0 1 1 0 6 3 3 0 0 1 0-6Z"/></svg>
-                    Get the Chrome Extension
-                </a>
-                <a class="btn btn--coffee" href="#" data-cta="coffee" id="coffeeLink">☕ Buy me a coffee · 50 Kč</a>
-                <a class="btn btn--ghost" href="https://github.com/matejcermak/mapycz_strava" target="_blank" rel="noopener">
-                    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 1.5A10.5 10.5 0 0 0 8.7 22c.5.1.7-.2.7-.5v-1.7c-2.9.6-3.5-1.4-3.5-1.4-.5-1.2-1.2-1.5-1.2-1.5-.9-.6.1-.6.1-.6 1 .1 1.6 1 1.6 1 .9 1.6 2.4 1.1 3 .9.1-.7.4-1.1.6-1.4-2.3-.3-4.7-1.2-4.7-5.1 0-1.1.4-2 1-2.7-.1-.3-.5-1.3.1-2.7 0 0 .9-.3 2.8 1a9.6 9.6 0 0 1 5 0c1.9-1.3 2.8-1 2.8-1 .6 1.4.2 2.4.1 2.7.7.7 1 1.6 1 2.7 0 3.9-2.4 4.8-4.7 5.1.4.3.7.9.7 1.9v2.8c0 .3.2.6.7.5A10.5 10.5 0 0 0 12 1.5Z"/></svg>
-                    View on GitHub
-                </a>
-            </div>
-            <p class="fineprint" style="margin-top:18px;">Works in Chrome, Brave, Edge &amp; Opera · needs you logged in to Strava (Subscription for high-zoom &amp; personal heat)</p>
-            <div class="maintain">
-                <span class="dot-pulse" aria-hidden="true"></span>
-                <span><b>Actively maintained.</b> I fix bugs and ship improvements regularly — hit one, or have an idea?
-                    <a href="https://github.com/matejcermak/mapycz_strava/issues" target="_blank" rel="noopener">Open a GitHub issue →</a></span>
-            </div>
-        </div>
-    </section>
 </main>
 
 <footer>
@@ -284,7 +267,7 @@
             <a href="https://github.com/matejcermak/mapycz_strava" target="_blank" rel="noopener">GitHub</a>
             <a href="https://github.com/matejcermak/mapycz_strava/issues" target="_blank" rel="noopener">Issues &amp; feedback</a>
             <a href="https://github.com/matejcermak/mapycz_strava/blob/main/PRIVACY.md" target="_blank" rel="noopener">Privacy</a>
-            <a href="#get">Donate</a>
+            <a href="#" data-cta="coffee">Donate</a>
         </div>
         <p class="disclaim">An independent project — not affiliated with Strava or Mapy.com. Heat data © Strava; maps © Mapy.com / Seznam.cz.</p>
     </div>
