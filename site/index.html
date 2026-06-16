@@ -276,7 +276,9 @@
 <script>
     // ===== Edit these two links when ready =====
     const CHROME_URL = "https://chromewebstore.google.com/"; // TODO: published extension URL
-    const STRIPE_URL = "https://donate.stripe.com/REPLACE_ME"; // TODO: Stripe Payment Link, 50 Kč preset, Apple/Google Pay on
+    // TEST payment link (50 Kč preset, pay-what-you-want, Apple/Google Pay in checkout).
+    // NOTE: test mode — only accepts Stripe test cards. Swap for the LIVE Payment Link before launch.
+    const STRIPE_URL = "https://donate.stripe.com/test_cNicN59mE2hg2ms8k84AU00";
     document.querySelectorAll('[data-cta="chrome"]').forEach((a) => { a.href = CHROME_URL; a.target = "_blank"; a.rel = "noopener"; });
     document.querySelectorAll('[data-cta="coffee"]').forEach((a) => { a.href = STRIPE_URL; a.target = "_blank"; a.rel = "noopener"; });
 </script>
