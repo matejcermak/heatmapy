@@ -77,7 +77,13 @@
     }
     h1 { font-size: clamp(32px, 5.2vw, 52px); line-height: 1.05; letter-spacing: -0.03em; margin: 0 auto 16px; max-width: 13ch; }
     h1 .g { background: linear-gradient(90deg, var(--orange), #ff8a3d); -webkit-background-clip: text; background-clip: text; color: transparent; }
-    .sub { font-size: clamp(16px, 2.2vw, 19px); color: var(--muted); max-width: 640px; margin: 0 auto 26px; }
+    .sub { font-size: clamp(16px, 2.2vw, 19px); color: var(--muted); max-width: 660px; margin: 0 auto 26px; }
+    /* heatmap wording: global/generic = bold orange, personal = bold blue */
+    .hm { font-weight: 700; color: var(--orange); white-space: nowrap; }
+    .hmp { font-weight: 700; color: var(--blue); white-space: nowrap; }
+    /* Mapy.com is a link, emphasized with underline only — no color change */
+    .mapy-link { color: inherit; text-decoration: underline; text-underline-offset: 2px; text-decoration-thickness: 1.5px; }
+    .mapy-link:hover { text-decoration-thickness: 2.5px; }
     .cta-row { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin-bottom: 12px; }
     .fineprint { font-size: 13px; color: var(--muted); }
     .fineprint b { color: var(--ink); }
@@ -174,9 +180,10 @@
     <!-- HERO -->
     <section class="hero">
         <div class="wrap">
-            <h1>Strava heat, on the map that's <span class="g">actually good at planning</span>.</h1>
-            <p class="sub">Overlay your Strava global <b>and</b> personal heatmaps on <b>Mapy.com</b> — switch
-                MTB / Ride / Run, and spot the roads and trails you've never explored yet.</p>
+            <h1>Strava heatmaps, on the map that's <span class="g">actually good at planning</span>.</h1>
+            <p class="sub">Overlay Strava's <span class="hm">global heatmap</span> and your
+                <span class="hmp">personal heatmap</span> on <a class="mapy-link" href="https://mapy.com" target="_blank" rel="noopener">Mapy.com</a> —
+                switch 🚴 Road / 🚵 MTB / 🏃 Running maps, and spot the roads and trails you've never explored yet.</p>
             <div class="cta-row">
                 <a class="btn btn--chrome" href="#" data-cta="chrome">
                     <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 0 1 8.66 5H12a5 5 0 0 0-4.33 2.5L4.2 4.8A10 10 0 0 1 12 2Zm9.5 6.5A10 10 0 0 1 12 22l4.33-7.5A5 5 0 0 0 12 7h9.5ZM2.5 6.6 6.83 14A5 5 0 0 0 12 17l-1.7 5A10 10 0 0 1 2.5 6.6ZM12 9a3 3 0 1 1 0 6 3 3 0 0 1 0-6Z"/></svg>
@@ -193,7 +200,6 @@
                 <span><b>Actively maintained.</b> I fix bugs and ship improvements regularly — hit one, or have an idea?
                     <a href="https://github.com/matejcermak/mapycz_strava/issues" target="_blank" rel="noopener">Open a GitHub issue →</a></span>
             </div>
-            <p class="fineprint">Open source · works in Chrome, Brave, Edge &amp; Opera · needs you logged in to Strava (Subscription for high-zoom &amp; personal heat)</p>
 
             <div class="video">
                 <img src="img/hero.png" alt="Strava heatmap overlaid on Mapy.com" />
@@ -209,7 +215,7 @@
         <div class="wrap">
             <div class="kicker">Why Mapy.com</div>
             <h2>A map built for the outdoors — and for planning</h2>
-            <p class="lead">Strava's base map is thin. Mapy.com's outdoor map shows what actually matters when you're
+            <p class="lead">Strava's base map is thin. <a class="mapy-link" href="https://mapy.com" target="_blank" rel="noopener">Mapy.com</a>'s outdoor map shows what actually matters when you're
                 choosing where to go.</p>
             <div class="grid">
                 <div class="card">
@@ -240,18 +246,19 @@
     <section class="block" id="extension">
         <div class="wrap">
             <div class="kicker">The extension</div>
-            <h2>Now with the best thing about Strava: everyone's heat</h2>
-            <p class="lead">Combine Mapy.com's planning with Strava's crowd data. Switch the <b>global</b> heat between
-                <b>MTB / Ride / Run</b>, then overlay <b>your own</b> heat in blue — and instantly see roads the locals
-                know that you haven't ridden yet.</p>
+            <h2>Now with the best thing about Strava: everyone's <span class="hm">heatmaps</span></h2>
+            <p class="lead">Combine <a class="mapy-link" href="https://mapy.com" target="_blank" rel="noopener">Mapy.com</a>'s planning with Strava's crowd data. Switch the
+                <span class="hm">global heatmap</span> between 🚴 Road / 🚵 MTB / 🏃 Running, then overlay your
+                <span class="hmp">personal heatmap</span> on top — and instantly see roads the locals know that you
+                haven't ridden yet.</p>
             <div class="shots">
                 <figure>
-                    <img src="img/mtb.png" alt="Global MTB heat with personal heat overlaid" />
-                    <figcaption>Global MTB heat (orange) + your personal heat (blue)</figcaption>
+                    <img src="img/mtb.png" alt="Global MTB heatmap with personal heatmap overlaid" />
+                    <figcaption><span class="hm">Global MTB heatmap</span> + your <span class="hmp">personal heatmap</span></figcaption>
                 </figure>
                 <figure>
-                    <img src="img/ride.png" alt="Global Ride heat on Mapy.com" />
-                    <figcaption>Switch to Ride or Run with one key</figcaption>
+                    <img src="img/ride.png" alt="Global Road heatmap on Mapy.com" />
+                    <figcaption>Switch to Road or Running in one click</figcaption>
                 </figure>
             </div>
         </div>
@@ -269,7 +276,7 @@
             <a href="https://github.com/matejcermak/mapycz_strava/blob/main/PRIVACY.md" target="_blank" rel="noopener">Privacy</a>
             <a href="#" data-cta="coffee">Donate</a>
         </div>
-        <p class="disclaim">An independent project — not affiliated with Strava or Mapy.com. Heat data © Strava; maps © Mapy.com / Seznam.cz.</p>
+        <p class="disclaim">An independent project — not affiliated with Strava or <a class="mapy-link" href="https://mapy.com" target="_blank" rel="noopener">Mapy.com</a>. Heatmap data © Strava; maps © <a class="mapy-link" href="https://mapy.com" target="_blank" rel="noopener">Mapy.com</a> / Seznam.cz.</p>
     </div>
 </footer>
 
