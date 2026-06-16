@@ -43,38 +43,73 @@ async function fetchTile(url) {
     }
 }
 
-// Best-effort: read the logged-in athlete id from Strava so the personal
-// heatmap (which keys tiles by athlete id) works without manual setup.
-async function detectAthlete() {
-    const sources = [
-        "https://www.strava.com/maps/personal-heatmap",
-        "https://www.strava.com/",
-        "https://www.strava.com/settings/profile",
-    ];
-    const patterns = [
-        /personal-heatmaps-external\.strava\.com\/tiles\/(\d+)\//,
-        /"athlete_id"\s*:\s*(\d+)/,
-        /\\"athlete_id\\":(\d+)/,
-        /strava\.com\/athletes\/(\d+)/,
-        /"athlete"\s*:\s*\{[^}]*"id"\s*:\s*(\d+)/,
-    ];
-    for (const src of sources) {
-        try {
-            const resp = await fetch(src, { credentials: "include" });
-            if (!resp.ok) {
-                continue;
+function b64urlDecode(s) {
+    let str = String(s || "").replace(/-/g, "+").replace(/_/g, "/");
+    while (str.length % 4) {
+        str += "=";
+    }
+    return atob(str);
+}
+
+// The reliable source: Strava's `_strava_idcf` cookie is a JWT whose payload
+// holds the logged-in athlete id. (Scraping a page can match the WRONG athlete.)
+async function athleteIdFromCookie() {
+    try {
+        const c = await chrome.cookies.get({
+            url: "https://www.strava.com",
+            name: "_strava_idcf",
+        });
+        if (c && c.value && c.value.split(".").length >= 2) {
+            const payload = JSON.parse(b64urlDecode(c.value.split(".")[1]));
+            if (payload && payload.athleteId) {
+                return String(payload.athleteId);
             }
-            const text = await resp.text();
-            for (const re of patterns) {
-                const m = text.match(re);
-                if (m && m[1]) {
-                    await chrome.storage.local.set({ [ATHLETE_KEY]: m[1] });
-                    return { ok: true, athleteId: m[1], source: src };
-                }
-            }
-        } catch (_) {
-            // try next source
         }
+    } catch (_) {
+        // ignore
+    }
+    return "";
+}
+
+async function detectAthlete() {
+    let id = await athleteIdFromCookie();
+    if (!id) {
+        // Fallback: scrape a page. Only patterns that name the OWN athlete.
+        const sources = [
+            "https://www.strava.com/maps/personal-heatmap",
+            "https://www.strava.com/settings/profile",
+        ];
+        const patterns = [
+            /personal-heatmaps-external\.strava\.com\/tiles\/(\d+)\//,
+            /"athlete_?[iI]d"\s*:\s*(\d+)/,
+            /\\"athleteId\\":(\d+)/,
+        ];
+        for (const src of sources) {
+            try {
+                const resp = await fetch(src, { credentials: "include" });
+                if (!resp.ok) {
+                    continue;
+                }
+                const text = await resp.text();
+                for (const re of patterns) {
+                    const m = text.match(re);
+                    if (m && m[1]) {
+                        id = m[1];
+                        break;
+                    }
+                }
+            } catch (_) {
+                // try next source
+            }
+            if (id) {
+                break;
+            }
+        }
+    }
+    if (id) {
+        await chrome.storage.local.set({ [ATHLETE_KEY]: id });
+        console.log("[msh] athlete id detected:", id);
+        return { ok: true, athleteId: id };
     }
     return { ok: false };
 }

@@ -35,10 +35,9 @@
     const ADD_POINT_HINT = (IS_MAC ? "⌘-click" : "Ctrl-click") + " the map to add a route point";
 
     // ---- State ---------------------------------------------------------------
-    let savedLayers = null; // remembers global/personal so A can restore them
-    let globalMode = "mtb"; // "mtb" | "ride" | "run" | "off"
+    let masterOff = false; // A: hide both layers (the chosen sport is kept)
+    let globalSport = "mtb"; // "mtb" | "ride" | "run" (S cycles, never "off")
     let personalOn = false;
-    let lastSport = "mtb"; // "mtb" | "ride" | "run"
     let opacity = 100;
     let athleteId = "";
 
@@ -71,16 +70,15 @@
         }
     }
 
-    globalMode = lsGet("globalMode", "mtb");
-    if (globalMode === "road") {
-        globalMode = "ride"; // migrate the old name
+    let legacyMode = lsGet("globalMode", "");
+    if (legacyMode === "road") {
+        legacyMode = "ride"; // migrate the old name
     }
-    if (!["mtb", "ride", "run", "off"].includes(globalMode)) {
-        globalMode = "mtb";
-    }
-    if (globalMode !== "off") {
-        lastSport = globalMode;
-    }
+    const storedSport = lsGet("globalSport", "");
+    globalSport = ["mtb", "ride", "run"].includes(storedSport)
+        ? storedSport
+        : (["mtb", "ride", "run"].includes(legacyMode) ? legacyMode : "mtb");
+    masterOff = lsGet("masterOff", "") === "1" || legacyMode === "off";
     personalOn = lsGet("personalOn", "") === "1";
     opacity = clamp(parseInt(lsGet("opacity", "100"), 10) || 100, 0, 100);
 
@@ -488,12 +486,12 @@
     }
 
     function getActiveLayers() {
-        const layers = [];
-        if (globalMode !== "off") {
-            layers.push({ kind: "global", sport: globalMode });
+        if (masterOff) {
+            return [];
         }
+        const layers = [{ kind: "global", sport: globalSport }];
         if (personalOn && athleteId) {
-            layers.push({ kind: "personal", sport: globalMode === "off" ? lastSport : globalMode });
+            layers.push({ kind: "personal", sport: globalSport });
         }
         return layers;
     }
@@ -555,9 +553,9 @@
             Math.round(rect.height),
             Math.round(rect.left),
             Math.round(rect.top),
-            globalMode,
+            masterOff ? "1" : "0",
+            globalSport,
             personalOn ? "1" : "0",
-            lastSport,
             opacity,
             athleteId,
         ].join("|");
@@ -639,19 +637,19 @@
         const p = panelRoot.querySelector('[data-act="personal"]');
         const hint = panelRoot.querySelector(".msh-hint");
         const slider = panelRoot.querySelector(".msh-slider");
-        const anyOn = globalMode !== "off" || personalOn;
         if (sw) {
-            sw.classList.toggle("msh-switch--on", anyOn);
+            sw.classList.toggle("msh-switch--on", !masterOff);
         }
         if (g) {
-            g.textContent = "(S) Global: " + (globalMode === "off" ? "off" : SPORT_LABEL[globalMode]);
-            g.classList.toggle("msh-btn--global", globalMode !== "off");
-            g.classList.toggle("msh-btn--off", globalMode === "off");
+            g.textContent = "(S) Global: " + SPORT_LABEL[globalSport];
+            g.classList.toggle("msh-btn--global", !masterOff);
+            g.classList.toggle("msh-btn--off", masterOff);
         }
         if (p) {
+            const personalActive = !masterOff && personalOn;
             p.textContent = "(D) Personal: " + (personalOn ? "on" : "off");
-            p.classList.toggle("msh-btn--personal", personalOn);
-            p.classList.toggle("msh-btn--off", !personalOn);
+            p.classList.toggle("msh-btn--personal", personalActive);
+            p.classList.toggle("msh-btn--off", !personalActive);
         }
         if (slider) {
             slider.value = String(opacity);
@@ -666,19 +664,27 @@
 
     // ---- Actions -------------------------------------------------------------
     function cycleGlobal() {
-        const order = ["mtb", "ride", "run", "off"];
-        globalMode = order[(order.indexOf(globalMode) + 1) % order.length];
-        if (globalMode !== "off") {
-            lastSport = globalMode;
+        if (masterOff) {
+            masterOff = false; // un-hide, showing the remembered sport
+        } else {
+            const order = ["mtb", "ride", "run"];
+            globalSport = order[(order.indexOf(globalSport) + 1) % order.length];
         }
-        lsSet("globalMode", globalMode);
+        lsSet("globalSport", globalSport);
+        lsSet("masterOff", masterOff ? "1" : "0");
         lastStateKey = "";
         renderPanel();
         requestRender();
     }
     function togglePersonal() {
-        personalOn = !personalOn;
+        if (masterOff) {
+            masterOff = false;
+            personalOn = true;
+        } else {
+            personalOn = !personalOn;
+        }
         lsSet("personalOn", personalOn ? "1" : "0");
+        lsSet("masterOff", masterOff ? "1" : "0");
         lastStateKey = "";
         if (personalOn && !athleteId) {
             toast("Personal heatmap: log in to Strava (Subscriber) and reload to enable.");
@@ -686,24 +692,10 @@
         renderPanel();
         requestRender();
     }
-    // "A" = master switch: turn BOTH layers off (remembering them), or restore.
+    // "A" = master on/off: hide both layers (the sport choice is kept) or show them.
     function masterToggle() {
-        if (globalMode !== "off" || personalOn) {
-            savedLayers = { globalMode, personalOn };
-            globalMode = "off";
-            personalOn = false;
-        } else if (savedLayers) {
-            globalMode = savedLayers.globalMode;
-            personalOn = savedLayers.personalOn;
-            if (globalMode !== "off") {
-                lastSport = globalMode;
-            }
-        } else {
-            globalMode = "mtb";
-            lastSport = "mtb";
-        }
-        lsSet("globalMode", globalMode);
-        lsSet("personalOn", personalOn ? "1" : "0");
+        masterOff = !masterOff;
+        lsSet("masterOff", masterOff ? "1" : "0");
         lastStateKey = "";
         renderPanel();
         requestRender();

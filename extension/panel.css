@@ -125,11 +125,15 @@
     text-decoration: none;
 }
 
-.msh-toast--link {
+/* Higher specificity than the base .msh-toast (which sets pointer-events:none
+   and is declared later in this file) so the link is actually clickable. */
+.msh-toast.msh-toast--link {
     pointer-events: auto;
+    bottom: 175px; /* clear the control panel */
+    z-index: 2147483647;
 }
 
-.msh-toast--link a {
+.msh-toast.msh-toast--link a {
     color: #ffd200;
     font-weight: 600;
 }
