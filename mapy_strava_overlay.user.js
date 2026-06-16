@@ -1,13 +1,12 @@
 // ==UserScript==
 // @name         Mapy + Strava Heatmap Overlay
 // @namespace    mapy-strava-overlay
-// @version      0.13.0
+// @version      0.14.0
 // @description  Overlay Strava global heatmap or Waymarked Trails MTB/road route layers on mapy.com, switchable, while keeping Mapy controls.
 // @downloadURL  https://github.com/matejcermak/mapycz_strava/raw/refs/heads/main/mapy_strava_overlay.user.js
 // @updateURL    https://github.com/matejcermak/mapycz_strava/raw/refs/heads/main/mapy_strava_overlay.user.js
 // @match        https://mapy.com/*
 // @match        https://www.strava.com/maps/*
-// @match        https://www.strava.com/routes/*
 // @grant        GM_getValue
 // @grant        GM_setValue
 // @grant        GM_xmlhttpRequest
@@ -164,9 +163,6 @@
     const STORAGE_KEY_AUTH_TS = "stravaHeatmapAuthTimestamp";
     const STORAGE_KEY_MAPY_LAST_GPX_EXPORT_URL = "mapyLastGpxExportUrl";
     const STORAGE_KEY_MAPY_LAST_GPX_EXPORT_SIG = "mapyLastGpxExportSignature";
-    const STORAGE_KEY_STRAVA_ROUTE_B64 = "stravaRoutePendingGpxBase64";
-    const STORAGE_KEY_STRAVA_ROUTE_NAME = "stravaRoutePendingGpxName";
-    const STORAGE_KEY_STRAVA_ROUTE_TS = "stravaRoutePendingTimestamp";
     const CAN_USE_GM_REQUEST =
         typeof GM_xmlhttpRequest === "function" ||
         (typeof GM === "object" && typeof GM !== null &&
@@ -698,20 +694,20 @@
         return "";
     }
 
-    async function exportPlannerGpxAndOpenStravaRoute() {
-        logAutomation("E: start export to Strava route");
+    async function exportPlannerRouteGpx() {
+        logAutomation("E: export route GPX (download)");
         const exportUrl = await ensureMapyPlannerGpxExportUrl();
         if (!exportUrl) {
             showNotice(
-                "Couldn't trigger/capture Mapy GPX export for this route.\n" +
-                "If the export dialog opened, try clicking Export once manually and then press S again."
+                "Couldn't get the route GPX from Mapy.\n" +
+                "Plan a route first (start + destination), then press E."
             );
-            logAutomation("S: failed (no exportUrl)");
+            logAutomation("E: failed (no exportUrl)");
             return;
         }
 
-        logAutomation(`S: fetch GPX url=${shortText(exportUrl, 110)}`);
-        showNotice("Exporting GPX...");
+        logAutomation(`E: fetch GPX url=${shortText(exportUrl, 110)}`);
+        showNotice("Exporting route GPX...");
         let blob;
         try {
             const exportUrlObj = new URL(exportUrl, window.location.origin);
@@ -722,114 +718,33 @@
                 throw new Error(`Mapy export failed: ${resp.status} ${resp.statusText}`);
             }
             blob = await resp.blob();
-            logAutomation(`S: GPX fetched (${blob.size} bytes)`);
+            logAutomation(`E: GPX fetched (${blob.size} bytes)`);
         } catch (err) {
             updateDebugPanel(`export error: ${String(err && err.message ? err.message : err)}`);
             showNotice(`GPX export failed: ${String(err && err.message ? err.message : err)}`);
-            logAutomation(`S: fetch failed (${String(err && err.message ? err.message : err)})`);
+            logAutomation(`E: fetch failed (${String(err && err.message ? err.message : err)})`);
             return;
         } finally {
             internalMapyExportFetch = false;
         }
 
-        const b64 = await blobToBase64(blob);
+        // Download the GPX — universal and login-free. Import into Garmin
+        // Connect / the Wahoo app (both accept a GPX directly, no third party).
         const name = `mapy-route-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-")}.gpx`;
-        gmSetValue(STORAGE_KEY_STRAVA_ROUTE_B64, b64);
-        gmSetValue(STORAGE_KEY_STRAVA_ROUTE_NAME, name);
-        gmSetValue(STORAGE_KEY_STRAVA_ROUTE_TS, String(Date.now()));
-        showNotice("GPX ready. Opening Strava route import...");
-        logAutomation("E: opening strava.com/routes/new");
-        window.open("https://www.strava.com/routes/new", "_blank", "noopener,noreferrer");
-    }
-
-    function installStravaRouteUpload() {
-        const pendingB64 = String(gmGetValue(STORAGE_KEY_STRAVA_ROUTE_B64, "") || "");
-        if (!pendingB64) {
-            return;
+        try {
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = name;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            window.setTimeout(() => URL.revokeObjectURL(url), 15000);
+            showNotice("Route GPX downloaded — import it into Garmin Connect or the Wahoo app.");
+            logAutomation("E: GPX downloaded");
+        } catch (err) {
+            showNotice(`Download failed: ${String(err && err.message ? err.message : err)}`);
         }
-        if (!/^\/routes\/new/.test(window.location.pathname)) {
-            window.location.assign("https://www.strava.com/routes/new");
-            return;
-        }
-        const pendingName = String(
-            gmGetValue(STORAGE_KEY_STRAVA_ROUTE_NAME, "route.gpx") || "route.gpx"
-        );
-
-        const clearPending = () => {
-            gmSetValue(STORAGE_KEY_STRAVA_ROUTE_B64, "");
-            gmSetValue(STORAGE_KEY_STRAVA_ROUTE_NAME, "");
-        };
-
-        const findGpxInput = () => {
-            const inputs = Array.from(document.querySelectorAll("input[type='file']"));
-            if (!inputs.length) {
-                return null;
-            }
-            // Prefer one whose accept/name/class hints at a route file.
-            return (
-                inputs.find((i) =>
-                    /gpx|tcx|route|\.xml/i.test(
-                        `${i.getAttribute("accept") || ""} ${i.name || ""} ${i.className || ""}`
-                    )
-                ) || inputs[0]
-            );
-        };
-
-        const attachToInput = (input) => {
-            try {
-                const blob = base64ToBlob(pendingB64, "application/gpx+xml");
-                const file = new File([blob], pendingName, { type: "application/gpx+xml" });
-                const dt = new DataTransfer();
-                dt.items.add(file);
-                input.files = dt.files;
-                input.dispatchEvent(new Event("change", { bubbles: true }));
-                return true;
-            } catch (_) {
-                return false;
-            }
-        };
-
-        // Fallback if Strava's uploader has no injectable <input>: drop the GPX
-        // into Downloads so the user can pick it via Strava's upload (↑) icon.
-        const downloadFallback = () => {
-            try {
-                const blob = base64ToBlob(pendingB64, "application/gpx+xml");
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement("a");
-                a.href = url;
-                a.download = pendingName;
-                document.body.appendChild(a);
-                a.click();
-                a.remove();
-                window.setTimeout(() => URL.revokeObjectURL(url), 15000);
-            } catch (_) {
-                // ignore
-            }
-        };
-
-        let tries = 0;
-        const timer = window.setInterval(() => {
-            tries += 1;
-            const input = findGpxInput();
-            if (input && attachToInput(input)) {
-                window.clearInterval(timer);
-                clearPending();
-                showNotice(
-                    "Route loaded into Strava. Name it, click Save Route, then star it\n" +
-                    "so it syncs to your Garmin / Wahoo."
-                );
-                return;
-            }
-            if (tries >= 12) {
-                window.clearInterval(timer);
-                downloadFallback();
-                clearPending();
-                showNotice(
-                    "Saved the route GPX to your Downloads.\n" +
-                    "Click Strava's upload (↑) icon over the map and pick it, then Save Route."
-                );
-            }
-        }, 1000);
     }
 
     function extractAuthQueryFromUrl(urlText) {
@@ -2207,8 +2122,8 @@
             }
             if (key.toLowerCase() === "e") {
                 consume();
-                exportPlannerGpxAndOpenStravaRoute().catch((err) => {
-                    showNotice(`Export to Strava failed: ${String(err && err.message ? err.message : err)}`);
+                exportPlannerRouteGpx().catch((err) => {
+                    showNotice(`Route export failed: ${String(err && err.message ? err.message : err)}`);
                 });
                 return;
             }
@@ -2246,11 +2161,7 @@
 
     function bootstrap() {
         if (window.location.hostname.includes("strava.com")) {
-            if (/^\/routes/.test(window.location.pathname)) {
-                installStravaRouteUpload();
-            } else {
-                installStravaAuthCapture();
-            }
+            installStravaAuthCapture();
             return;
         }
         // Restore J/K toggle state across reloads.

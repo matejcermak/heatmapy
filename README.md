@@ -104,9 +104,9 @@ Main controls are a left-hand cluster: **A S D**.
 - `D` — toggle your **personal** heatmap on/off (blue). Its sport follows `S`
   (MTB global → MTB personal, Ride global → Ride personal); when global is off it
   uses the last sport you looked at.
-- `E` — export the current Mapy planner route as GPX and open Strava's route
-  import (`strava.com/routes/new`); name it, **Save Route**, then star it so it
-  syncs to your Garmin / Wahoo
+- `E` — download the current Mapy planner route as a GPX file (login-free,
+  universal); import it into Garmin Connect or the Wahoo ELEMNT app to get it
+  onto your device
 - `[` / `]` — decrease / increase opacity in 10% steps
 - `Alt + D` — toggle debug panel
 
