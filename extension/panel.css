@@ -40,6 +40,46 @@
     margin-top: 6px;
 }
 
+#msh-panel .msh-row--master {
+    gap: 8px;
+}
+
+#msh-panel .msh-switch {
+    width: 40px;
+    height: 22px;
+    border-radius: 11px;
+    background: #5a5a62;
+    position: relative;
+    display: inline-block;
+    cursor: pointer;
+    transition: background 0.15s;
+    flex: 0 0 auto;
+}
+
+#msh-panel .msh-switch--on {
+    background: #4f7cff;
+}
+
+#msh-panel .msh-knob {
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: #fff;
+    transition: left 0.15s;
+}
+
+#msh-panel .msh-switch--on .msh-knob {
+    left: 20px;
+}
+
+#msh-panel .msh-master-label {
+    font-weight: 600;
+    opacity: 0.92;
+}
+
 #msh-panel .msh-btn {
     cursor: pointer;
     border: 0;

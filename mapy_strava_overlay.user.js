@@ -2190,7 +2190,7 @@
                 lastStateKey = "";
                 const labels = {
                     mtb: "Global heatmap: MTB (hot)",
-                    road: "Global heatmap: Road (hot)",
+                    road: "Global heatmap: Ride (hot)",
                     off: "Global heatmap: off",
                 };
                 showNotice(labels[globalMode]);
@@ -2218,11 +2218,6 @@
                 }
                 updateDebugPanel(`personal -> ${personalOn ? "on" : "off"}`);
                 requestRender();
-                return;
-            }
-            if (key.toLowerCase() === "f") {
-                consume();
-                toggleMapyBaseLayer();
                 return;
             }
             if (key.toLowerCase() === "e") {
@@ -2256,12 +2251,6 @@
                     overlayRoot.style.opacity = String(FILTERS.gOpacity / 100);
                 }
                 requestRender();
-                return;
-            }
-
-            if (key.toLowerCase() === "p") {
-                consume();
-                togglePanorama();
                 return;
             }
         };

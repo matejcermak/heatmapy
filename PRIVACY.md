@@ -1,8 +1,8 @@
-# Privacy Policy — Strava Heatmap for Mapy.cz
+# Privacy Policy — Strava Heatmap for Mapy.com
 
-_Last updated: 2026-06-08_
+_Last updated: 2026-06-16_
 
-This Chrome extension overlays your Strava heatmaps on mapy.cz. It is designed to
+This Chrome extension overlays your Strava heatmaps on Mapy.com. It is designed to
 keep your data on your own machine.
 
 ## What it accesses
@@ -29,8 +29,8 @@ keep your data on your own machine.
 - It does **not** send your data, browsing activity, or Strava information to the
   developer or any third-party server. There are no analytics, no tracking, and
   no remote code.
-- It only runs on `mapy.cz` / `mapy.com` (the overlay) and only contacts
-  `strava.com` (to fetch your tiles).
+- It only runs on Mapy.com (the `mapy.com` and `mapy.cz` domains, for the overlay)
+  and only contacts `strava.com` (to fetch your tiles).
 
 ## Permissions
 

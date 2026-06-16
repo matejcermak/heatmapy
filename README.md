@@ -1,8 +1,21 @@
-# Strava Heatmap for Mapy.cz
+# Strava Heatmap for Mapy.com
 
-Overlay your **Strava heatmaps** on [mapy.cz](https://mapy.cz) for bike route
-planning — the **global per-sport heatmap** (MTB / road, in *hot*) plus your own
-**personal heatmap** (in blue), shown together over the real map.
+Overlay your **Strava heatmaps** on [Mapy.com](https://mapy.com) — the **global
+heatmap split by sport** (MTB / Ride / Run, in *hot*) plus your own **personal
+heatmap** (in blue), shown together over the real map. Find the roads and trails
+you've never ridden or run yet — on the map with the best route planning around.
+
+![Demo](assets/demo.gif)
+
+| Global MTB + your personal heat | Global Ride + your personal heat |
+| --- | --- |
+| ![MTB + personal](assets/screenshot-mtb-personal.png) | ![Ride + personal](assets/screenshot-ride-personal.png) |
+
+The **global** heat shows where everyone goes; your **personal** heat (blue) shows
+where *you've* already been. Together they make the good lines obvious — and the
+ones you still haven't explored. That's the whole point of planning. Per-sport
+**MTB / Ride / Run** layers mean it's not just for cyclists. And Mapy.com's
+outdoor + aerial maps and route planner beat the usual map apps for this.
 
 Two ways to run it:
 
@@ -27,15 +40,22 @@ above zoom 11 and the personal heatmap require a **Strava Subscription**.
 4. Make sure you're **logged in to Strava** in the same browser (open
    `strava.com` once). Click the extension icon → it auto-detects your athlete ID
    (or paste it manually from your `strava.com/athletes/<id>` profile URL).
-5. Open [mapy.cz](https://mapy.cz) — use the **on-map panel** (bottom-left) or the
-   keys below.
+5. Open [Mapy.com](https://mapy.com) — use the **on-map panel** (bottom-left) or
+   the keys below.
 
 ### Controls
 
-- On-map panel (bottom-left): **Global** button cycles MTB → Road → off,
-  **Personal** toggles your blue heatmap, plus an opacity slider.
-- Hotkeys: `A` overlay on/off · `S` global cycle · `D` personal toggle ·
-  `[` / `]` opacity.
+On-map panel (bottom-left):
+
+- **(A) Heatmaps** — master on/off switch; turns both layers off (and back on).
+- **(S) Global** — cycles **MTB → Ride → Run → off** (in *hot*).
+- **(D) Personal** — toggles your heatmap (in *blue*); it follows the sport
+  selected in Global.
+- Opacity slider.
+
+The keys mirror the buttons: `A` master · `S` global sport · `D` personal ·
+`[` / `]` opacity. When planning a route, **⌘-click (Mac) / Ctrl-click (PC)** the
+map to add a point.
 
 ### How it works
 
@@ -75,20 +95,17 @@ any third party. See [PRIVACY.md](PRIVACY.md).
 
 Two independent overlays — a **global** heatmap (`S`) and your **personal**
 heatmap (`D`) — that can be shown together (personal blue on top of global hot).
-Main controls are a left-hand cluster: **A S D F**.
+Main controls are a left-hand cluster: **A S D**.
 
-- `A` — toggle the whole overlay on/off
+- `A` — master on/off (turns both the global and personal layers off, and back)
 - `S` — cycle the **global** heatmap (remembered across reloads):
-  **MTB** (hot) → **Road** (hot) → **off**.
+  **MTB** (hot) → **Ride** (hot) → **off**.
 - `D` — toggle your **personal** heatmap on/off (blue). Its sport follows `S`
-  (MTB global → MTB personal, Road global → Road personal); when global is off it
-  uses the last bike sport you looked at.
-- `F` — toggle Mapy base map between **aerial** (satellite) and **outdoor**
-  (aerial shows best whether an MTB path is actually rideable).
+  (MTB global → MTB personal, Ride global → Ride personal); when global is off it
+  uses the last sport you looked at.
 - `E` — export current Mapy planner route as GPX and open Ride with GPS upload
 - `[` / `]` — decrease / increase opacity in 10% steps
 - `Alt + D` — toggle debug panel
-- `P` — toggle Mapy panorama
 
 Colors are **fixed**: global heatmaps are `hot`; personal is **blue**. The
 personal endpoint returns **opaque-black** tiles (background black, heat in

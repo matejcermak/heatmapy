@@ -18,7 +18,7 @@
 
 - **Store icon**: 128×128 PNG (already in `icons/icon128.png`; replace with a nicer
   one if you want).
-- **Screenshots**: 1–5, **1280×800** or **640×400** PNG/JPG. Use the mapy.cz overlay
+- **Screenshots**: 1–5, **1280×800** or **640×400** PNG/JPG. Use the mapy.com overlay
   (MTB hot + personal blue), the on-map panel, aerial+heat, etc.
 - **Promo (optional)**: small 440×280 tile; marquee 1400×560. The GIF/video you
   shoot can seed these.
@@ -26,18 +26,20 @@
 
 ## Listing copy (draft — edit freely)
 
-**Name**: Strava Heatmap for Mapy.cz
+**Name**: Strava Heatmap for Mapy.com
 
 **Short description** (≤132 chars):
-> See your Strava heatmaps on mapy.cz — global MTB/road popularity plus your own
-> personal heatmap, for better bike route planning.
+> See your Strava heatmaps on Mapy.com — global MTB / Ride / Run popularity plus
+> your own personal heatmap, for better route planning.
 
 **Detailed description**:
-> Plan bike routes on mapy.cz with Strava's heat on top of the map.
+> Plan routes on Mapy.com with Strava's heat on top of the map.
 >
-> • Global heatmap, split by discipline — switch between Mountain Bike and Road.
-> • Your personal heatmap in blue, overlaid on the global heat.
-> • On-map controls plus keyboard shortcuts (A / S / D), opacity, fast tile caching.
+> • Global heatmap, split by sport — switch between MTB, Ride, and Run.
+> • Your personal heatmap in blue, overlaid on the global heat, following the same
+>   sport — so you can spot the roads and trails you haven't done yet.
+> • On-map controls plus keyboard shortcuts (A master / S global / D personal),
+>   opacity, fast tile caching.
 >
 > Requires being logged in to Strava in the same browser. The global heatmap above
 > zoom 11 and the personal heatmap require a Strava Subscription. The extension only
@@ -54,6 +56,6 @@
 
 ## Notes / caveats to mention in the listing
 
-- This is an independent project, **not affiliated with Strava or Mapy.cz**.
+- This is an independent project, **not affiliated with Strava or Mapy.com**.
 - Uses Strava's heatmap the same way the Strava website does (your session); if
   Strava changes their endpoints it may need an update.

@@ -21,7 +21,12 @@
     const PERSONAL_ALPHA_GAIN = 2.5;
     const PERSONAL_ALPHA_FLOOR = 90;
     const PERSONAL_ALPHA_THRESHOLD = 8;
-    const BIKE_SPORT_TOKEN = { mtb: "sport_MountainBikeRide", road: "sport_Ride" };
+    const SPORT_TOKEN = {
+        mtb: "sport_MountainBikeRide",
+        ride: "sport_Ride",
+        run: "sport_Run",
+    };
+    const SPORT_LABEL = { mtb: "MTB", ride: "Ride", run: "Run" };
     const MIN_ZOOM = 0;
     const MAX_ZOOM = 22;
     const GLOBAL_TILE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
@@ -31,9 +36,9 @@
 
     // ---- State ---------------------------------------------------------------
     let savedLayers = null; // remembers global/personal so A can restore them
-    let globalMode = "mtb"; // "mtb" | "road" | "off"
+    let globalMode = "mtb"; // "mtb" | "ride" | "run" | "off"
     let personalOn = false;
-    let lastBikeSport = "mtb";
+    let lastSport = "mtb"; // "mtb" | "ride" | "run"
     let opacity = 100;
     let athleteId = "";
 
@@ -66,11 +71,15 @@
         }
     }
 
-    globalMode = ["mtb", "road", "off"].includes(lsGet("globalMode", "mtb"))
-        ? lsGet("globalMode", "mtb")
-        : "mtb";
+    globalMode = lsGet("globalMode", "mtb");
+    if (globalMode === "road") {
+        globalMode = "ride"; // migrate the old name
+    }
+    if (!["mtb", "ride", "run", "off"].includes(globalMode)) {
+        globalMode = "mtb";
+    }
     if (globalMode !== "off") {
-        lastBikeSport = globalMode;
+        lastSport = globalMode;
     }
     personalOn = lsGet("personalOn", "") === "1";
     opacity = clamp(parseInt(lsGet("opacity", "100"), 10) || 100, 0, 100);
@@ -176,7 +185,7 @@
         return ((x % world) + world) % world;
     }
     function buildGlobalUrl(sport, z, x, y) {
-        const token = BIKE_SPORT_TOKEN[sport] || BIKE_SPORT_TOKEN.mtb;
+        const token = SPORT_TOKEN[sport] || SPORT_TOKEN.mtb;
         return (
             `https://${GLOBAL_HOST}/identified/globalheat/${token}/${GLOBAL_COLOR}/` +
             `${z}/${wrapX(x, z)}/${y}.png?v=19&missing=empty`
@@ -186,7 +195,7 @@
         if (!athleteId) {
             return "";
         }
-        const token = BIKE_SPORT_TOKEN[sport] || BIKE_SPORT_TOKEN.mtb;
+        const token = SPORT_TOKEN[sport] || SPORT_TOKEN.mtb;
         return (
             `https://${PERSONAL_HOST}/tiles/${athleteId}/grayscale/${z}/${wrapX(x, z)}/${y}.png` +
             `?missing=empty&filter_type=${token}&include_everyone=true&include_followers_only=true` +
@@ -484,7 +493,7 @@
             layers.push({ kind: "global", sport: globalMode });
         }
         if (personalOn && athleteId) {
-            layers.push({ kind: "personal", sport: globalMode === "off" ? lastBikeSport : globalMode });
+            layers.push({ kind: "personal", sport: globalMode === "off" ? lastSport : globalMode });
         }
         return layers;
     }
@@ -548,7 +557,7 @@
             Math.round(rect.top),
             globalMode,
             personalOn ? "1" : "0",
-            lastBikeSport,
+            lastSport,
             opacity,
             athleteId,
         ].join("|");
@@ -596,9 +605,13 @@
         panelRoot.id = "msh-panel";
         panelRoot.innerHTML = [
             '<div class="msh-title"><span class="msh-dot"></span>Strava heat</div>',
+            '<div class="msh-row msh-row--master">',
+            '  <span class="msh-switch" data-act="master" role="switch" tabindex="0"><span class="msh-knob"></span></span>',
+            '  <span class="msh-master-label">(A) Heatmaps</span>',
+            "</div>",
             '<div class="msh-row">',
-            '  <button class="msh-btn" data-act="global">Global: MTB</button>',
-            '  <button class="msh-btn" data-act="personal">Personal: off</button>',
+            '  <button class="msh-btn" data-act="global">(S) Global: MTB</button>',
+            '  <button class="msh-btn" data-act="personal">(D) Personal: off</button>',
             "</div>",
             '<div class="msh-row msh-op">',
             '  <span>Opacity</span>',
@@ -608,6 +621,7 @@
         ].join("");
         document.body.appendChild(panelRoot);
 
+        panelRoot.querySelector('[data-act="master"]').addEventListener("click", masterToggle);
         panelRoot.querySelector('[data-act="global"]').addEventListener("click", cycleGlobal);
         panelRoot.querySelector('[data-act="personal"]').addEventListener("click", togglePersonal);
         const slider = panelRoot.querySelector(".msh-slider");
@@ -620,18 +634,22 @@
         if (!panelRoot) {
             return;
         }
+        const sw = panelRoot.querySelector('[data-act="master"]');
         const g = panelRoot.querySelector('[data-act="global"]');
         const p = panelRoot.querySelector('[data-act="personal"]');
         const hint = panelRoot.querySelector(".msh-hint");
         const slider = panelRoot.querySelector(".msh-slider");
+        const anyOn = globalMode !== "off" || personalOn;
+        if (sw) {
+            sw.classList.toggle("msh-switch--on", anyOn);
+        }
         if (g) {
-            const gl = { mtb: "Global: MTB", road: "Global: Road", off: "Global: off" };
-            g.textContent = gl[globalMode];
+            g.textContent = "(S) Global: " + (globalMode === "off" ? "off" : SPORT_LABEL[globalMode]);
             g.classList.toggle("msh-btn--global", globalMode !== "off");
             g.classList.toggle("msh-btn--off", globalMode === "off");
         }
         if (p) {
-            p.textContent = personalOn ? "Personal: on" : "Personal: off";
+            p.textContent = "(D) Personal: " + (personalOn ? "on" : "off");
             p.classList.toggle("msh-btn--personal", personalOn);
             p.classList.toggle("msh-btn--off", !personalOn);
         }
@@ -639,19 +657,19 @@
             slider.value = String(opacity);
         }
         if (hint) {
-            const top = athleteId
-                ? "Keys: A off · S global · D personal · [ ] opacity"
-                : '<a href="' + STRAVA_HEATMAP_URL + '" target="_blank" rel="noopener">Log in to Strava ↗</a> to enable';
-            hint.innerHTML = top + "<br>" + ADD_POINT_HINT;
+            const login = athleteId
+                ? ""
+                : '<a href="' + STRAVA_HEATMAP_URL + '" target="_blank" rel="noopener">Log in to Strava ↗</a> to enable personal · ';
+            hint.innerHTML = login + ADD_POINT_HINT;
         }
     }
 
     // ---- Actions -------------------------------------------------------------
     function cycleGlobal() {
-        const order = ["mtb", "road", "off"];
+        const order = ["mtb", "ride", "run", "off"];
         globalMode = order[(order.indexOf(globalMode) + 1) % order.length];
         if (globalMode !== "off") {
-            lastBikeSport = globalMode;
+            lastSport = globalMode;
         }
         lsSet("globalMode", globalMode);
         lastStateKey = "";
@@ -678,11 +696,11 @@
             globalMode = savedLayers.globalMode;
             personalOn = savedLayers.personalOn;
             if (globalMode !== "off") {
-                lastBikeSport = globalMode;
+                lastSport = globalMode;
             }
         } else {
             globalMode = "mtb";
-            lastBikeSport = "mtb";
+            lastSport = "mtb";
         }
         lsSet("globalMode", globalMode);
         lsSet("personalOn", personalOn ? "1" : "0");
