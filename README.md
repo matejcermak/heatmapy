@@ -22,7 +22,7 @@ Two ways to run it:
 - **`extension/`** — a **Chrome extension** (Manifest V3). The easy, one-click
   way; this is what goes to the Chrome Web Store. See **[Chrome extension](#chrome-extension)**.
 - **`mapy_strava_overlay.user.js`** — the original **Tampermonkey userscript**
-  for power users (also does Waymarked Trails layers, GPX→Ride with GPS export,
+  for power users (also does Waymarked Trails layers, GPX→Strava route export,
   etc.). See **[Userscript](#userscript-tampermonkey)**.
 
 You need to be **logged in to Strava** in the same browser. The global heatmap
@@ -104,7 +104,9 @@ Main controls are a left-hand cluster: **A S D**.
 - `D` — toggle your **personal** heatmap on/off (blue). Its sport follows `S`
   (MTB global → MTB personal, Ride global → Ride personal); when global is off it
   uses the last sport you looked at.
-- `E` — export current Mapy planner route as GPX and open Ride with GPS upload
+- `E` — export the current Mapy planner route as GPX and open Strava's route
+  import (`strava.com/routes/new`); name it, **Save Route**, then star it so it
+  syncs to your Garmin / Wahoo
 - `[` / `]` — decrease / increase opacity in 10% steps
 - `Alt + D` — toggle debug panel
 
