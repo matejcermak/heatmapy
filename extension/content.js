@@ -62,8 +62,8 @@
         if (!panelRoot) {
             return;
         }
-        const spin = panelRoot.querySelector(".msh-spin");
-        if (!spin) {
+        const load = panelRoot.querySelector(".msh-load");
+        if (!load) {
             return;
         }
         if (pendingTiles > 0) {
@@ -71,13 +71,13 @@
                 clearTimeout(loadingHideTimer);
                 loadingHideTimer = null;
             }
-            spin.classList.add("is-loading");
+            load.classList.add("is-loading");
         } else if (!loadingHideTimer) {
             // brief debounce so it doesn't flicker between renders
             loadingHideTimer = window.setTimeout(() => {
                 loadingHideTimer = null;
                 if (pendingTiles === 0) {
-                    spin.classList.remove("is-loading");
+                    load.classList.remove("is-loading");
                 }
             }, 250);
         }
@@ -643,7 +643,15 @@
         panelRoot = document.createElement("div");
         panelRoot.id = "msh-panel";
         panelRoot.innerHTML = [
-            '<div class="msh-title"><span class="msh-dot"></span>Strava heat<span class="msh-spin" aria-hidden="true" title="Loading heatmap tiles…"></span></div>',
+            '<div class="msh-title">' +
+            '<svg class="msh-logo" viewBox="0 0 40 40" aria-hidden="true">' +
+            '<rect width="40" height="40" rx="11" fill="#15151a"/>' +
+            '<path d="M7 27C16 20 17 12 24 10 31 8 33 19 38 13" fill="none" stroke="#fc5200" stroke-width="4.5" stroke-linecap="round"/>' +
+            '<path d="M6 33C16 30 22 22 28 23 34 24 35 31 39 29" fill="none" stroke="#1e90ff" stroke-width="3.4" stroke-linecap="round"/>' +
+            "</svg>" +
+            "Heatmapy" +
+            '<span class="msh-load" aria-hidden="true"><span class="msh-spin"></span><span class="msh-loadlabel">loading…</span></span>' +
+            "</div>",
             '<div class="msh-row msh-row--master">',
             '  <span class="msh-switch" data-act="master" role="switch" tabindex="0"><span class="msh-knob"></span></span>',
             '  <span class="msh-master-label">(A) Heatmaps</span>',
