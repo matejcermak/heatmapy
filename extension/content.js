@@ -48,9 +48,39 @@
     let rafId = null;
     let renderSeq = 0;
     let lastStateKey = "";
+    let pendingTiles = 0; // tiles currently fetching from the network (not cache)
+    let loadingHideTimer = null;
 
     function clamp(v, lo, hi) {
         return Math.max(lo, Math.min(hi, v));
+    }
+
+    // Show a spinner in the panel while tiles are being fetched (first load is
+    // slow until they're cached). Cache hits don't count, so it only spins on
+    // real network activity.
+    function updateLoading() {
+        if (!panelRoot) {
+            return;
+        }
+        const spin = panelRoot.querySelector(".msh-spin");
+        if (!spin) {
+            return;
+        }
+        if (pendingTiles > 0) {
+            if (loadingHideTimer) {
+                clearTimeout(loadingHideTimer);
+                loadingHideTimer = null;
+            }
+            spin.classList.add("is-loading");
+        } else if (!loadingHideTimer) {
+            // brief debounce so it doesn't flicker between renders
+            loadingHideTimer = window.setTimeout(() => {
+                loadingHideTimer = null;
+                if (pendingTiles === 0) {
+                    spin.classList.remove("is-loading");
+                }
+            }, 250);
+        }
     }
 
     // ---- Persistence (localStorage on the mapy origin) -----------------------
@@ -412,29 +442,40 @@
                     return;
                 }
             }
-            const res = await fetchTileViaSW(url);
             if (seq !== renderSeq) {
-                return; // a newer render superseded this tile
-            }
-            if (!res.ok || !res.blob) {
-                if (res.status === 401 || res.status === 403) {
-                    noteAuthFailure();
-                }
                 return;
             }
-            if (layer.kind === "personal") {
-                const recolored = await recolorToBlue(res.blob);
+            // From here it's a real network fetch -> reflect it in the spinner.
+            pendingTiles += 1;
+            updateLoading();
+            try {
+                const res = await fetchTileViaSW(url);
                 if (seq !== renderSeq) {
+                    return; // a newer render superseded this tile
+                }
+                if (!res.ok || !res.blob) {
+                    if (res.status === 401 || res.status === 403) {
+                        noteAuthFailure();
+                    }
                     return;
                 }
-                const u = recolored || URL.createObjectURL(res.blob);
-                memPut(url, u);
-                img.src = u;
-            } else {
-                const u = URL.createObjectURL(res.blob);
-                memPut(url, u);
-                idbPut(url, res.blob);
-                img.src = u;
+                if (layer.kind === "personal") {
+                    const recolored = await recolorToBlue(res.blob);
+                    if (seq !== renderSeq) {
+                        return;
+                    }
+                    const u = recolored || URL.createObjectURL(res.blob);
+                    memPut(url, u);
+                    img.src = u;
+                } else {
+                    const u = URL.createObjectURL(res.blob);
+                    memPut(url, u);
+                    idbPut(url, res.blob);
+                    img.src = u;
+                }
+            } finally {
+                pendingTiles -= 1;
+                updateLoading();
             }
         })();
     }
@@ -602,7 +643,7 @@
         panelRoot = document.createElement("div");
         panelRoot.id = "msh-panel";
         panelRoot.innerHTML = [
-            '<div class="msh-title"><span class="msh-dot"></span>Strava heat</div>',
+            '<div class="msh-title"><span class="msh-dot"></span>Strava heat<span class="msh-spin" aria-hidden="true" title="Loading heatmap tiles…"></span></div>',
             '<div class="msh-row msh-row--master">',
             '  <span class="msh-switch" data-act="master" role="switch" tabindex="0"><span class="msh-knob"></span></span>',
             '  <span class="msh-master-label">(A) Heatmaps</span>',

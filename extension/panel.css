@@ -30,6 +30,27 @@
     display: inline-block;
 }
 
+#msh-panel .msh-spin {
+    width: 12px;
+    height: 12px;
+    box-sizing: border-box;
+    border-radius: 50%;
+    border: 2px solid rgba(255, 255, 255, 0.25);
+    border-top-color: #fc5200;
+    display: none;
+    animation: msh-spin 0.7s linear infinite;
+}
+
+#msh-panel .msh-spin.is-loading {
+    display: inline-block;
+}
+
+@keyframes msh-spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
 #msh-panel .msh-row {
     display: flex;
     align-items: center;

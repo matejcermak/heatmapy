@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Strava Heatmap for Mapy.com",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Overlay your Strava global and personal heatmaps (MTB / Ride / Run) on Mapy.com for route planning.",
   "icons": {
     "16": "icons/icon16.png",
