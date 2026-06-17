@@ -356,9 +356,8 @@
 <script>
     // ===== Edit these two links when ready =====
     const CHROME_URL = "https://chromewebstore.google.com/"; // TODO: published extension URL
-    // TEST payment link (50 Kč preset, pay-what-you-want, Apple/Google Pay in checkout).
-    // NOTE: test mode — only accepts Stripe test cards. Swap for the LIVE Payment Link before launch.
-    const STRIPE_URL = "https://donate.stripe.com/test_cNicN59mE2hg2ms8k84AU00";
+    // LIVE payment link (50 Kč preset, pay-what-you-want, Apple/Google Pay in checkout).
+    const STRIPE_URL = "https://donate.stripe.com/5kQ5kD6bo4oV83UcCd5J600";
     document.querySelectorAll('[data-cta="chrome"]').forEach((a) => { a.href = CHROME_URL; a.target = "_blank"; a.rel = "noopener"; });
     document.querySelectorAll('[data-cta="coffee"]').forEach((a) => { a.href = STRIPE_URL; a.target = "_blank"; a.rel = "noopener"; });
 
