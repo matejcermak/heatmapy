@@ -333,9 +333,9 @@
     // always show the link's base currency. So we keep one Payment Link per currency and route
     // to the right one by the visitor's country (via Cloudflare's /cdn-cgi/trace `loc=`).
     const DONATE_LINKS = {
-        CZK: "https://donate.stripe.com/5kQ5kD6bo4oV83UcCd5J600",  // 50 Kč preset — Czechia
-        EUR: "",   // TODO: paste EUR pay-what-you-want Payment Link
-        USD: "",   // TODO: paste USD pay-what-you-want Payment Link
+        CZK: "https://buy.stripe.com/28EfZh2Zc1cJ5VM59L5J601",  // Czechia
+        EUR: "https://buy.stripe.com/bJeeVdczM3kR97Y45H5J602",  // Europe
+        USD: "https://buy.stripe.com/14AbJ1eHU3kR83Uby95J603",  // rest of world
     };
     const EUR_COUNTRIES = new Set("AT BE BG HR CY DK EE FI FR DE GR HU IE IT LV LT LU MT NL PL PT RO SE SI SK ES NO IS LI CH GB".split(" "));
     function donateLinkFor(cc) {
