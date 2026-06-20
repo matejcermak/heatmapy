@@ -59,11 +59,9 @@
     .nav .spacer { flex: 1; }
     .nav a.ghost { color: var(--muted); text-decoration: none; font-weight: 600; font-size: 14px; }
     .nav a.ghost:hover { color: var(--ink); }
-    .lang-switch { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 700; letter-spacing: 0.02em; }
-    .lang-switch a { color: var(--muted); text-decoration: none; }
-    .lang-switch a:hover { color: var(--ink); }
-    .lang-switch a.is-active { color: var(--ink); }
-    .lang-switch .lang-sep { color: var(--line); font-weight: 400; }
+    .lang-switch { font-size: 13px; font-weight: 700; letter-spacing: 0.04em; color: var(--muted);
+        text-decoration: none; padding: 5px 9px; border-radius: 8px; border: 1px solid var(--line); line-height: 1; }
+    .lang-switch:hover { color: var(--ink); border-color: #cfcfd8; background: rgba(0,0,0,0.03); }
 
     .btn {
         display: inline-flex; align-items: center; gap: 8px;
@@ -200,13 +198,11 @@
         <span class="spacer"></span>
         <a class="ghost hide-sm" href="#why" data-i18n="nav.why">Why Mapy</a>
         <a class="ghost hide-sm" href="#compare">Mapy.com vs Strava</a>
-        <span class="lang-switch" role="group" aria-label="Language">
-            <a href="#" data-lang-btn="en">EN</a><span class="lang-sep">/</span><a href="#" data-lang-btn="cs">CS</a>
-        </span>
         <a class="btn btn--chrome btn--sm" href="#get" data-cta="chrome">
             <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 0 1 8.66 5H12a5 5 0 0 0-4.33 2.5L4.2 4.8A10 10 0 0 1 12 2Zm9.5 6.5A10 10 0 0 1 12 22l4.33-7.5A5 5 0 0 0 12 7h9.5ZM2.5 6.6 6.83 14A5 5 0 0 0 12 17l-1.7 5A10 10 0 0 1 2.5 6.6ZM12 9a3 3 0 1 1 0 6 3 3 0 0 1 0-6Z"/></svg>
             <span data-i18n="cta.chrome">Chrome Extension (Free)</span>
         </a>
+        <a href="#" class="lang-switch" data-lang-toggle aria-label="Switch language">EN</a>
     </div>
 </header>
 
@@ -380,7 +376,9 @@
     const enTitle = document.title;
     const i18nCache = {};
     document.querySelectorAll('[data-i18n]').forEach((el) => { i18nCache[el.getAttribute('data-i18n')] = el.innerHTML; });
+    let currentLang = 'en';
     function applyLang(lang) {
+        currentLang = lang;
         document.documentElement.lang = lang;
         document.title = (lang === 'cs' && CS['meta.title']) ? CS['meta.title'] : enTitle;
         document.querySelectorAll('[data-i18n]').forEach((el) => {
@@ -388,16 +386,20 @@
             const v = lang === 'cs' ? CS[k] : i18nCache[k];
             if (v != null) el.innerHTML = v;
         });
-        document.querySelectorAll('[data-lang-btn]').forEach((b) => b.classList.toggle('is-active', b.getAttribute('data-lang-btn') === lang));
+        // switcher shows the active language; title hints what a click does
+        document.querySelectorAll('[data-lang-toggle]').forEach((b) => {
+            b.textContent = lang.toUpperCase();
+            b.title = lang === 'en' ? 'Přepnout do češtiny' : 'Switch to English';
+        });
     }
     const savedLang = localStorage.getItem('lang');
     const initialLang = savedLang || ((navigator.language || 'en').toLowerCase().startsWith('cs') ? 'cs' : 'en');
     applyLang(initialLang);
-    document.querySelectorAll('[data-lang-btn]').forEach((b) => b.addEventListener('click', (e) => {
+    document.querySelectorAll('[data-lang-toggle]').forEach((b) => b.addEventListener('click', (e) => {
         e.preventDefault();
-        const lang = b.getAttribute('data-lang-btn');
-        localStorage.setItem('lang', lang);
-        applyLang(lang);
+        const next = currentLang === 'cs' ? 'en' : 'cs';
+        localStorage.setItem('lang', next);
+        applyLang(next);
     }));
 </script>
 </body>
