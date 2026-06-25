@@ -335,6 +335,7 @@
             "(Subscription for zoom &gt; 11 / personal).<br>" +
             '<a href="' + STRAVA_HEATMAP_URL + '" target="_blank" rel="noopener noreferrer">' +
             "Open Strava heatmap ↗</a> — then reload this page.";
+        positionToastAbovePanel(el);
         document.body.appendChild(el);
         window.setTimeout(() => el.remove(), 9000);
     }
@@ -686,7 +687,11 @@
             '  <input class="msh-slider" type="range" min="0" max="100" step="10" aria-label="Heatmap opacity" />',
             "</div>",
             '<div class="msh-row msh-actions">',
-            '  <button class="msh-send" data-act="send">Send route to Strava</button>',
+            '  <button class="msh-send" data-act="send">',
+            '    <span class="msh-send-label">Sync to Strava</span>',
+            '    <svg class="msh-send-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="7" y="6" width="10" height="12" rx="3"/><path d="M9 6V3.5h6V6M9 18v2.5h6V18"/><path d="M12 9.8v2.3l1.4.9"/></svg>',
+            '    <svg class="msh-send-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="6" y="4" width="12" height="16" rx="2"/><path d="M9 8h6M9 12h6M9 16h3"/></svg>',
+            "  </button>",
             '  <button class="msh-export" data-act="export" title="Download GPX">⬇</button>',
             "</div>",
             '<div class="msh-hint"></div>',
@@ -989,6 +994,37 @@
             return { ok: false, error: String(err && err.message ? err.message : err) };
         }
     }
+    // Build the Strava route name: local-time timestamp + Mapy's own export name.
+    // Mapy writes that name as the GPX track name (<trk><name>…</name>) — the same
+    // text shown in its Save dialog and the page <title>.
+    function decodeXmlEntities(s) {
+        return String(s)
+            .replace(/&lt;/g, "<")
+            .replace(/&gt;/g, ">")
+            .replace(/&quot;/g, '"')
+            .replace(/&apos;/g, "'")
+            .replace(/&#(\d+);/g, function (_, n) { return String.fromCharCode(parseInt(n, 10)); })
+            .replace(/&amp;/g, "&");
+    }
+    function mapyRouteName(gpx) {
+        if (!gpx) {
+            return "";
+        }
+        const m =
+            gpx.match(/<trk\b[^>]*>[\s\S]*?<name>([\s\S]*?)<\/name>/i) ||
+            gpx.match(/<name>([\s\S]*?)<\/name>/i);
+        return m ? decodeXmlEntities(m[1]).trim() : "";
+    }
+    function composeRouteName(gpx) {
+        const d = new Date();
+        const p = (n) => String(n).padStart(2, "0");
+        const ts =
+            d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate()) +
+            " " + p(d.getHours()) + ":" + p(d.getMinutes());
+        const name = mapyRouteName(gpx);
+        // Strava caps route names at 200 chars.
+        return (name ? ts + " " + name : ts).slice(0, 200);
+    }
     let sendBusy = false;
     async function sendRouteToStrava() {
         if (sendBusy) {
@@ -996,8 +1032,8 @@
         }
         sendBusy = true;
         const btn = panelRoot && panelRoot.querySelector('[data-act="send"]');
-        const restore = btn ? btn.textContent : "";
-        if (btn) { btn.textContent = "Sending…"; btn.disabled = true; }
+        const restore = btn ? btn.innerHTML : "";
+        if (btn) { btn.textContent = "Syncing…"; btn.disabled = true; }
         try {
             toast("Preparing route from Mapy…");
             const g = await getMapyGpxText();
@@ -1008,11 +1044,11 @@
             const res = await chrome.runtime.sendMessage({
                 type: "uploadStravaRoute",
                 gpx: g.gpx,
-                name: "Mapy route " + new Date().toISOString().slice(0, 16).replace("T", " "),
+                name: composeRouteName(g.gpx),
                 sport: globalSport,
             });
             if (res && res.ok) {
-                toast("Sent to Strava ✓ (starred) — it'll sync to your connected Garmin/Wahoo on the next sync.");
+                toast("Synced to Strava ✓ (starred) — it'll appear on your connected Garmin/Wahoo on the next device sync.");
             } else if (res && res.needLogin) {
                 toast("Log in to Strava (Subscriber) in this browser to send routes.");
             } else {
@@ -1021,12 +1057,25 @@
         } catch (err) {
             toast("Send failed: " + String(err && err.message ? err.message : err));
         } finally {
-            if (btn) { btn.textContent = restore; btn.disabled = false; }
+            if (btn) { btn.innerHTML = restore; btn.disabled = false; }
             window.setTimeout(() => { sendBusy = false; }, 800);
         }
     }
 
     // ---- Toast ---------------------------------------------------------------
+    // The panel's height is dynamic, so pin the toast just above its actual
+    // height (panel sits at bottom:12px) rather than a fixed offset that the
+    // taller panel would overlap.
+    function positionToastAbovePanel(el) {
+        const panel = panelRoot || document.getElementById("msh-panel");
+        if (!panel) {
+            return;
+        }
+        const h = panel.getBoundingClientRect().height || panel.offsetHeight || 0;
+        if (h) {
+            el.style.bottom = 12 + h + 8 + "px"; // panel bottom + height + gap
+        }
+    }
     function toast(message) {
         const text = String(message || "");
         if (!text) {
@@ -1035,6 +1084,7 @@
         const el = document.createElement("div");
         el.className = "msh-toast";
         el.textContent = text;
+        positionToastAbovePanel(el);
         document.body.appendChild(el);
         window.setTimeout(() => el.remove(), 4000);
     }

@@ -144,12 +144,16 @@ function pt(p) {
     return { lat: p.lat, lng: p.lng };
 }
 
-// Turn the /file parse output into the update-route `props` shape.
+// Turn the /file parse output into the create-route `props` shape.
 function transformParsedRoute(parsed, sport) {
     const r = (parsed && parsed.route) || {};
     const elements = (r.elements || []).map((e) => ({
         elementType: SR_EL_TYPE[e.element_type] || "Waypoint",
-        waypoint: { point: pt(e.waypoint.point), metadata: null },
+        // create-route's waypoint input expects `snapUncertainty` (how far the
+        // clicked point was from a snapped road). GPX points are exact, so 0.
+        // Sending `metadata` instead — as update-route tolerates — makes
+        // create-route fail with "Error resolving field".
+        waypoint: { point: pt(e.waypoint.point), snapUncertainty: 0 },
     }));
     const legs = (r.legs || []).map((leg, i) => ({
         legType: SR_LEG_TYPE[leg.leg_type] || "Search",
@@ -190,13 +194,6 @@ function transformParsedRoute(parsed, sport) {
     };
 }
 
-// Strava route ids are client-generated 64-bit snowflakes sent as strings.
-function genRouteId() {
-    const ms = BigInt(Date.now());
-    const rand = BigInt(Math.floor(Math.random() * 0x400000)); // 22 bits
-    return ((ms << 22n) | rand).toString();
-}
-
 async function postNextRoutes(endpoint, token, body) {
     const resp = await fetch("https://www.strava.com/api/next/data/routes/" + endpoint, {
         method: "POST",
@@ -213,35 +210,61 @@ async function postNextRoutes(endpoint, token, body) {
     return { ok: resp.ok, status: resp.status, text };
 }
 
-// Persist the route. The web app generates the id client-side and upserts via
-// update-route; we try that, and fall back to create-route just in case.
-async function persistStravaRoute(token, props) {
-    let lastErr = "";
-    const attempts = [
-        { ep: "update-route", withId: true },
-        { ep: "create-route", withId: false },
-    ];
-    for (const a of attempts) {
-        const props2 = Object.assign({}, props);
-        if (a.withId) {
-            props2.routeId = genRouteId();
-        }
-        try {
-            const res = await postNextRoutes(a.ep, token, { props: props2 });
-            if (res.ok) {
-                let data = null;
-                try { data = JSON.parse(res.text); } catch (_) {}
-                const id = props2.routeId
-                    || (data && (data.routeId || data.id || (data.route && data.route.id)))
-                    || null;
-                return { ok: true, id, url: id ? "https://www.strava.com/routes/" + id : null, via: a.ep };
-            }
-            lastErr = a.ep + " " + res.status + ": " + res.text.slice(0, 120);
-        } catch (e) {
-            lastErr = a.ep + ": " + String(e && e.message ? e.message : e);
+// Pull the route id out of a create-route response. Strava wraps the result in
+// a key named after the endpoint ({createRoute: …}); the id may be that value
+// itself, or an object carrying id / routeId / route.id. An explicit null means
+// the call failed.
+function pickRouteId(data) {
+    if (!data || typeof data !== "object") {
+        return null;
+    }
+    let inner;
+    if ("createRoute" in data) {
+        inner = data.createRoute;
+    } else if (data.route !== undefined) {
+        inner = data.route;
+    } else {
+        inner = data;
+    }
+    if (inner === null || inner === undefined) {
+        return null;
+    }
+    if (typeof inner === "number") {
+        return String(inner);
+    }
+    if (typeof inner === "string") {
+        return inner;
+    }
+    if (typeof inner === "object") {
+        const id =
+            inner.id ||
+            inner.routeId ||
+            (inner.route && (inner.route.id || inner.route.routeId));
+        if (id) {
+            return String(id);
         }
     }
-    return { ok: false, error: lastErr };
+    return null;
+}
+
+// Persist the route via create-route. update-route only edits an existing route
+// (it returns null for a route that doesn't exist yet); create-route makes a new
+// one, with the server assigning the id and returning it. The body must carry
+// the athleteId and use the snapUncertainty waypoint shape — see
+// transformParsedRoute / uploadStravaRoute.
+async function persistStravaRoute(token, props) {
+    try {
+        const res = await postNextRoutes("create-route", token, { props });
+        let data = null;
+        try { data = JSON.parse(res.text); } catch (_) {}
+        const id = res.ok ? pickRouteId(data) : null;
+        if (id) {
+            return { ok: true, id, url: "https://www.strava.com/routes/" + id, via: "create-route" };
+        }
+        return { ok: false, error: "create-route " + res.status + ": " + (res.text || "").slice(0, 200) };
+    } catch (e) {
+        return { ok: false, error: "create-route: " + String(e && e.message ? e.message : e) };
+    }
 }
 
 async function uploadStravaRoute(gpxText, name, sport) {
@@ -282,6 +305,15 @@ async function uploadStravaRoute(gpxText, name, sport) {
         return { ok: false, error: "empty-parse" };
     }
     // Step 2 — transform + Step 3 — save (always starred + Only You).
+    // create-route needs the athlete id; without it it fails to resolve.
+    let athleteId = await athleteIdFromCookie();
+    if (!athleteId) {
+        const d = await detectAthlete();
+        athleteId = (d && d.athleteId) || "";
+    }
+    if (!athleteId) {
+        return { ok: false, error: "no-athlete", needLogin: true };
+    }
     const t = transformParsedRoute(parsed, sport);
     const props = {
         name: name || parsed.name || "Mapy route",
@@ -291,6 +323,7 @@ async function uploadStravaRoute(gpxText, name, sport) {
         elements: t.elements,
         legs: t.legs,
         routePrefs: t.routePrefs,
+        athleteId: parseInt(athleteId, 10),
     };
     return await persistStravaRoute(token, props);
 }

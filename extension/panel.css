@@ -229,19 +229,32 @@
 #msh-panel .msh-send {
     flex: 1;
     height: 28px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
     cursor: pointer;
     border: 0;
     border-radius: 8px;
+    padding: 0;
     font: inherit;
     font-weight: 700;
     font-size: 13px;
     color: #fff;
-    background: #fc5200; /* Strava orange */
+    background: #3a3a40; /* grey, matches the other buttons */
     transition: background 0.15s;
 }
 
+/* device pictograms (watch + bike computer/phone) hinting the device sync */
+#msh-panel .msh-send-ico {
+    width: 16px;
+    height: 16px;
+    flex: 0 0 auto;
+    opacity: 0.85;
+}
+
 #msh-panel .msh-send:hover {
-    background: #e04800;
+    background: #4a4a52;
 }
 
 #msh-panel .msh-send:disabled {
