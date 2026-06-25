@@ -678,8 +678,10 @@
             "  </span>",
             "</div>",
             '<div class="msh-row msh-op">',
-            '  <span>Opacity</span>',
-            '  <input class="msh-slider" type="range" min="0" max="100" step="10" />',
+            '  <span class="msh-eye" aria-hidden="true" title="Heatmap opacity">' +
+            '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>' +
+            "</span>",
+            '  <input class="msh-slider" type="range" min="0" max="100" step="10" aria-label="Heatmap opacity" />',
             "</div>",
             '<div class="msh-row">',
             '  <button class="msh-export" data-act="export">⬇ Export route (GPX)</button>',
