@@ -836,7 +836,10 @@
                 typeof PointerEvent === "function"
                     ? new PointerEvent(type, { bubbles: true, cancelable: true, pointerType: "mouse", isPrimary: true, clientX: x, clientY: y })
                     : null;
-            const events = [mkPointer("pointerdown"), mkMouse("mousedown"), mkPointer("pointerup"), mkMouse("mouseup"), mkMouse("click")].filter(Boolean);
+            // Pointer/mouse sequence WITHOUT a synthetic "click" — the actual click
+            // comes from el.click() below. Dispatching both fired the handler twice
+            // (e.g. Mapy downloaded the GPX twice).
+            const events = [mkPointer("pointerdown"), mkMouse("mousedown"), mkPointer("pointerup"), mkMouse("mouseup")].filter(Boolean);
             for (const ev of events) {
                 el.dispatchEvent(ev);
                 if (secondary) {
