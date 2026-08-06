@@ -1,9 +1,152 @@
-// Service worker: the one thing a content script can't do in MV3 is a
+// Background worker: the one thing a content script can't do in MV3 is a
 // credentialed cross-origin fetch (CORS blocks it). With host_permissions for
 // *.strava.com, the worker can fetch Strava heatmap tiles with the user's
 // cookies attached and hand the bytes back to the content script.
+//
+// Runs as a service worker in Chrome and as an event page in Firefox (which has
+// no MV3 service workers) — see scripts/build.mjs, which emits the per-browser
+// `background` manifest key. Nothing here is service-worker specific.
+
+// Promise-based extension APIs: `browser` in Firefox, `chrome` in Chrome MV3.
+// (Firefox's `chrome` alias is callback-only, so awaiting it there returns
+// undefined — always go through `api`.)
+const api = globalThis.browser?.runtime?.id ? globalThis.browser : globalThis.chrome;
 
 const ATHLETE_KEY = "stravaAthleteId";
+const STRAVA_ORIGIN = "*://*.strava.com/*";
+
+// Firefox MV3 grants host permissions at install (127+) but lets the user revoke
+// them at any time; without them every credentialed fetch below fails opaquely.
+// Check first so the content script can tell the user how to fix it.
+async function hasStravaPermission() {
+    try {
+        if (!api.permissions || !api.permissions.contains) {
+            return true;
+        }
+        return await api.permissions.contains({ origins: [STRAVA_ORIGIN] });
+    } catch (_) {
+        return true; // can't tell — let the request itself decide
+    }
+}
+
+// ---- Firefox: find the cookie jar that holds the Strava login ---------------
+// Firefox containers each have their own cookie store, and Zen's workspaces are
+// containers — so a user can be logged in to Strava in a container while the
+// *default* store (which both cookies.getAll() and background fetch use) is
+// empty. Locate the store that actually has the session and use it everywhere.
+//
+// Markers of an authenticated session. `_strava4_session` is deliberately absent:
+// Strava sets that for anonymous visitors too, so it proves nothing. The
+// CloudFront-* pair is what authorizes the heatmap tile CDN.
+const SESSION_MARKERS = ["_strava_idcf", "CloudFront-Signature"];
+const IS_FIREFOX = !!globalThis.browser?.runtime?.id;
+const STORE_TTL_MS = 60000;
+let storeIdCache = null;
+let storeIdCachedAt = 0;
+let lastLoggedStoreId;
+
+// Returns a storeId to pass to the cookies API, or null to use the default store
+// (always the case in Chrome, which has no containers and already works).
+async function stravaStoreId() {
+    if (!IS_FIREFOX) {
+        return null;
+    }
+    const now = Date.now();
+    if (now - storeIdCachedAt < STORE_TTL_MS) {
+        return storeIdCache;
+    }
+    let found = null;
+    try {
+        // getAllCookieStores() only lists stores with open tabs, so check the
+        // default explicitly — it won't appear there if no tab is using it.
+        const ids = ["firefox-default"];
+        for (const s of await api.cookies.getAllCookieStores()) {
+            if (!ids.includes(s.id)) {
+                ids.push(s.id);
+            }
+        }
+        for (const id of ids) {
+            try {
+                const jar = await api.cookies.getAll({
+                    url: "https://www.strava.com/",
+                    storeId: id,
+                });
+                if (jar.some((c) => SESSION_MARKERS.includes(c.name))) {
+                    found = id;
+                    break;
+                }
+            } catch (_) {
+                // store not queryable — try the next
+            }
+        }
+    } catch (_) {
+        // fall through with found = null
+    }
+    storeIdCache = found;
+    storeIdCachedAt = now;
+    if (found !== lastLoggedStoreId) {
+        lastLoggedStoreId = found;
+        console.log("[msh] strava cookie store:", found || "(default / none found)");
+    }
+    return found;
+}
+
+// ---- Firefox: re-attach cookies to our own requests ------------------------
+// A background request's initiator is the moz-extension:// origin, so Firefox
+// treats it as cross-site and withholds Strava's SameSite cookies — every
+// credentialed fetch then comes back 403 / logged-out even though the user is
+// signed in and cookies.get() can see the session. Chrome exempts extension
+// requests that hold host permissions; Firefox doesn't. Firefox MV3 keeps
+// blocking webRequest, so put the Cookie header back on (fetch() itself can't —
+// Cookie is a forbidden header name).
+//
+// Chrome never registers this: webRequest/webRequestBlocking are only in the
+// Firefox manifest, so api.webRequest is undefined there. See scripts/build.mjs.
+let lastInjectShape;
+if (api.webRequest && api.webRequest.onBeforeSendHeaders) {
+    api.webRequest.onBeforeSendHeaders.addListener(
+        async (details) => {
+            // Only our own requests. Page requests (tabId >= 0) already carry the
+            // right cookies — rewriting those could break normal strava.com use.
+            if (details.tabId !== -1) {
+                return {};
+            }
+            if (details.originUrl && !details.originUrl.startsWith("moz-extension://")) {
+                return {};
+            }
+            const headers = (details.requestHeaders || []).filter(
+                (h) => h.name.toLowerCase() !== "cookie"
+            );
+            try {
+                // getAll({url}) applies host/path/secure matching but not SameSite —
+                // exactly the set the browser would have sent same-site.
+                const storeId = await stravaStoreId();
+                const jar = await api.cookies.getAll(
+                    storeId ? { url: details.url, storeId } : { url: details.url }
+                );
+                const cookie = jar.map((c) => c.name + "=" + c.value).join("; ");
+                if (cookie) {
+                    headers.push({ name: "Cookie", value: cookie });
+                }
+                // One line per distinct cookie set, not per tile — a map pan is
+                // hundreds of requests.
+                const shape = jar.length + ":" + (storeId || "default");
+                if (shape !== lastInjectShape) {
+                    lastInjectShape = shape;
+                    console.log(
+                        "[msh] cookie inject from", storeId || "default store", "—",
+                        jar.map((c) => c.name).join(",") || "(none)"
+                    );
+                }
+            } catch (_) {
+                return {}; // leave the request as-is rather than strip its cookies
+            }
+            return { requestHeaders: headers };
+        },
+        { urls: ["*://*.strava.com/*"] },
+        ["blocking", "requestHeaders"]
+    );
+}
 
 // runtime messaging serializes as JSON (not structured clone), so an ArrayBuffer
 // would be lost in transit. Encode tiles as a base64 data URL string instead.
@@ -18,6 +161,9 @@ function bufToBase64(buf) {
 }
 
 async function fetchTile(url) {
+    if (!(await hasStravaPermission())) {
+        return { ok: false, status: 0, needPermission: true };
+    }
     try {
         const resp = await fetch(url, {
             credentials: "include",
@@ -55,10 +201,12 @@ function b64urlDecode(s) {
 // holds the logged-in athlete id. (Scraping a page can match the WRONG athlete.)
 async function athleteIdFromCookie() {
     try {
-        const c = await chrome.cookies.get({
-            url: "https://www.strava.com",
-            name: "_strava_idcf",
-        });
+        const storeId = await stravaStoreId();
+        const query = { url: "https://www.strava.com", name: "_strava_idcf" };
+        if (storeId) {
+            query.storeId = storeId; // the login may live in a container jar
+        }
+        const c = await api.cookies.get(query);
         if (c && c.value && c.value.split(".").length >= 2) {
             const payload = JSON.parse(b64urlDecode(c.value.split(".")[1]));
             if (payload && payload.athleteId) {
@@ -71,7 +219,28 @@ async function athleteIdFromCookie() {
     return "";
 }
 
+// Is the extension actually authenticated to Strava? Distinguishes "not logged in"
+// from "logged in but the athlete id couldn't be read" — the two need different
+// fixes, and a catch-all message sends people to re-log-in pointlessly.
+//
+// This must be a real request, not a cookie check: `_strava4_session` is a Rails
+// session cookie that Strava sets for anonymous visitors too, so its presence
+// proves nothing. A logged-in-only page bounces to /login when unauthenticated.
+async function isStravaAuthenticated() {
+    try {
+        const r = await fetch("https://www.strava.com/settings/profile", {
+            credentials: "include",
+        });
+        return r.ok && !/\/login/.test(r.url);
+    } catch (_) {
+        return false;
+    }
+}
+
 async function detectAthlete() {
+    if (!(await hasStravaPermission())) {
+        return { ok: false, needPermission: true };
+    }
     let id = await athleteIdFromCookie();
     if (!id) {
         // Fallback: scrape a page. Only patterns that name the OWN athlete.
@@ -107,11 +276,13 @@ async function detectAthlete() {
         }
     }
     if (id) {
-        await chrome.storage.local.set({ [ATHLETE_KEY]: id });
+        await api.storage.local.set({ [ATHLETE_KEY]: id });
         console.log("[msh] athlete id detected:", id);
         return { ok: true, athleteId: id };
     }
-    return { ok: false };
+    const loggedIn = await isStravaAuthenticated();
+    console.warn("[msh] athlete id not detected; authenticated to strava:", loggedIn);
+    return { ok: false, loggedIn };
 }
 
 // ---- Send a planned route to Strava (the user's own session) -------------
@@ -271,6 +442,9 @@ async function uploadStravaRoute(gpxText, name, sport) {
     if (!gpxText || gpxText.indexOf("<gpx") === -1) {
         return { ok: false, error: "no-gpx" };
     }
+    if (!(await hasStravaPermission())) {
+        return { ok: false, needPermission: true };
+    }
     const token = await getStravaCsrfToken();
     if (!token) {
         return { ok: false, error: "no-csrf", needLogin: true };
@@ -328,7 +502,9 @@ async function uploadStravaRoute(gpxText, name, sport) {
     return await persistStravaRoute(token, props);
 }
 
-chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+// `return true` + sendResponse for async replies is supported by both Chrome and
+// Firefox (returning a Promise instead would work in Firefox but not Chrome).
+api.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     if (!msg || typeof msg !== "object") {
         return false;
     }
@@ -348,5 +524,9 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
 });
 
 // Kick off detection on install/startup so personal heat is ready when possible.
-chrome.runtime.onInstalled.addListener(() => detectAthlete());
-chrome.runtime.onStartup.addListener(() => detectAthlete());
+api.runtime.onInstalled.addListener(() => detectAthlete());
+api.runtime.onStartup.addListener(() => detectAthlete());
+// Firefox: the user can grant strava.com access after install — retry then.
+if (api.permissions && api.permissions.onAdded) {
+    api.permissions.onAdded.addListener(() => detectAthlete());
+}
