@@ -44,12 +44,51 @@ Strava** in the same browser (open `strava.com` once). Click the extension icon 
 it auto-detects your athlete ID (or paste it from your `strava.com/athletes/<id>`
 profile URL).
 
+### Firefox
+
+Heatmapy runs on **Firefox 128+** (that's when Firefox gained the `MAIN`-world
+content scripts the Mapy route hook needs). Until the AMO listing is up, install it
+from source:
+
+```bash
+npm run build:firefox        # → dist/firefox
+```
+
+Then `about:debugging#/runtime/this-firefox` → **Load Temporary Add-on** → pick
+`dist/firefox/manifest.json`. Or, with one command (auto-reloads on edits):
+
+```bash
+npm run start:firefox       # web-ext run, opens mapy.com
+```
+
+Log in to Strava in the same browser, then open [Mapy.com](https://mapy.com). If
+Firefox asks about — or you later revoke — access to `strava.com`, click the
+Heatmapy toolbar icon and use **Grant access**; the heatmap can't load without it.
+
 ### From source (unpacked, for development)
 
 1. Clone/download this repo.
 2. Chrome → `chrome://extensions` → enable **Developer mode** (top right).
 3. **Load unpacked** → select the `extension/` folder.
 4. Log in to Strava in the same browser, then open [Mapy.com](https://mapy.com).
+
+## Build
+
+No bundler and no dependencies — the build just copies `extension/` into
+`dist/<browser>/` and writes the per-browser `manifest.json` (Chrome needs a
+service worker, Firefox an event page + `browser_specific_settings`).
+
+```bash
+npm run build           # both targets → dist/chrome, dist/firefox
+npm run build:firefox   # just one
+npm run zip             # heatmapy-chrome.zip + heatmapy-firefox.zip for the stores
+npm run lint:firefox    # web-ext lint (what AMO runs)
+```
+
+`extension/manifest.json` is the single source of truth, kept in its Chrome form so
+`Load unpacked` on `extension/` still works directly. Firefox deltas live in
+`scripts/build.mjs`. Bump the version in **both** `extension/manifest.json` and
+`package.json`.
 
 ## Controls
 
@@ -88,15 +127,42 @@ can use the **⬇ GPX download** and import manually instead.)
 
 ## How it works
 
-- A **service worker** (`background.js`) fetches Strava heatmap tiles with your
+- A **background worker** (`background.js`) fetches Strava heatmap tiles with your
   logged-in cookies (`host_permissions` for `*.strava.com`) — content scripts
-  can't do credentialed cross-origin fetches in MV3, the worker can.
+  can't do credentialed cross-origin fetches in MV3, the worker can. It's a service
+  worker in Chrome and an event page in Firefox (which has no MV3 service workers);
+  the code is identical, only the manifest key differs.
 - `content.js` renders two stacked tile layers over Mapy's map, caches global
   tiles in IndexedDB (instant on reopen) and everything in memory, and
   canvas-recolors the personal tiles (Strava serves them as opaque black) to a
   transparent blue overlay.
 - Endpoints: global `content-a.strava.com/identified/globalheat/sport_*/hot/...`,
   personal `personal-heatmaps-external.strava.com/tiles/<athleteId>/...`.
+
+### Firefox: cookies need re-attaching
+
+Chrome sends the user's Strava cookies on the background worker's fetches for free.
+Firefox doesn't, for two reasons, and both break every credentialed request with a
+403 or a redirect to `/login`:
+
+1. A background request's initiator is the `moz-extension://` origin, so Firefox
+   treats it as **cross-site** and withholds Strava's `SameSite` cookies. Chrome
+   exempts extension requests holding host permissions.
+2. **Containers each have their own cookie store** — and Zen's workspaces are
+   containers. `cookies.getAll()` and background `fetch` both use the *default*
+   store, so a user logged in inside a container is invisible to the extension.
+
+So on Firefox only, `background.js` resolves which cookie store actually holds the
+Strava session (`stravaStoreId()`, keyed on `_strava_idcf` / `CloudFront-Signature`,
+since `_strava4_session` exists for anonymous visitors too) and re-attaches those
+cookies with a blocking `webRequest.onBeforeSendHeaders` listener — which Firefox
+MV3 still supports and Chrome removed. `fetch` can't do this itself: `Cookie` is a
+forbidden header name. The listener is scoped to `*://*.strava.com/*` and only
+touches the extension's own requests (`tabId === -1`), never page requests.
+
+The CloudFront signed cookies (`CloudFront-Policy` / `-Signature` / `-Key-Pair-Id`)
+are the ones that authorize the tile CDN — without them tiles 403 even when the
+session cookie is present.
 
 ### MTB vs road: actually split
 
