@@ -688,6 +688,9 @@
         }
         lastStateKey = key;
         drawTiles(state);
+        // Same frame as the layout above: fold however far the drawn centre moved
+        // into the outstanding pan offset, so the two never double up.
+        notePanRender(state);
     }
 
     function requestRender() {
@@ -1165,6 +1168,112 @@
         window.setInterval(requestRender, 250);
     }
 
+    // ---- Follow the map while panning ----------------------------------------
+    // The overlay's position comes from Mapy's URL, which Mapy rewrites *throttled*
+    // while you pan — so the URL always lags the pointer, and at the end of a drag
+    // it lands somewhere between where the pan started and where it stopped.
+    //
+    // So rather than guess, keep a running screen-pixel offset fed by both sources:
+    //   - pointer moves add their delta (the map moves 1:1 with the cursor)
+    //   - each render subtracts however far the *drawn* centre just travelled
+    // The two cancel out exactly as the URL catches up, whenever that happens, and
+    // the offset self-zeroes. No rebasing and no assumption about Mapy's timing.
+    let panOffsetX = 0;
+    let panOffsetY = 0;
+    let panOffsetOn = false;
+    let dragPointerId = null;
+    let lastPointerX = 0;
+    let lastPointerY = 0;
+    let lastDrawnCentre = null; // {x, y, zoom} in screen px at that zoom
+
+    function centrePx(state) {
+        // At a given (possibly fractional) zoom, world pixels *are* screen pixels.
+        return {
+            x: lonToTileX(state.lon, state.zoom) * 256,
+            y: latToTileY(state.lat, state.zoom) * 256,
+            zoom: state.zoom,
+        };
+    }
+
+    function applyPanOffset() {
+        if (!overlayRoot) {
+            return;
+        }
+        if (Math.abs(panOffsetX) < 0.5 && Math.abs(panOffsetY) < 0.5) {
+            if (panOffsetOn) {
+                overlayRoot.style.transform = "";
+                panOffsetOn = false;
+            }
+            return;
+        }
+        overlayRoot.style.transform = `translate3d(${panOffsetX}px, ${panOffsetY}px, 0)`;
+        panOffsetOn = true;
+    }
+
+    // Called by render() once the tiles have been laid out for `state`.
+    function notePanRender(state) {
+        const centre = centrePx(state);
+        if (lastDrawnCentre && lastDrawnCentre.zoom === centre.zoom) {
+            // Redrawing at a new centre shifts the tiles on screen by exactly this
+            // much, so the outstanding offset shrinks by the same amount.
+            panOffsetX += centre.x - lastDrawnCentre.x;
+            panOffsetY += centre.y - lastDrawnCentre.y;
+        } else {
+            // First render, or the zoom changed — pixel deltas across different
+            // zooms aren't comparable, so drop the offset rather than mis-apply it.
+            panOffsetX = 0;
+            panOffsetY = 0;
+        }
+        lastDrawnCentre = centre;
+        applyPanOffset();
+    }
+
+    function installDragFollow() {
+        window.addEventListener("pointerdown", (event) => {
+            // Left button, single pointer, and not a ⌘/Ctrl-click (that adds a
+            // route point rather than panning).
+            if (!event.isPrimary || event.button !== 0 || event.metaKey || event.ctrlKey) {
+                return;
+            }
+            if (panelRoot && panelRoot.contains(event.target)) {
+                return; // panel interaction, not a pan
+            }
+            const rect = getMapViewportRect();
+            if (
+                event.clientX < rect.left || event.clientX > rect.left + rect.width ||
+                event.clientY < rect.top || event.clientY > rect.top + rect.height
+            ) {
+                return;
+            }
+            dragPointerId = event.pointerId;
+            lastPointerX = event.clientX;
+            lastPointerY = event.clientY;
+        }, true);
+
+        window.addEventListener("pointermove", (event) => {
+            if (dragPointerId === null || event.pointerId !== dragPointerId) {
+                return;
+            }
+            panOffsetX += event.clientX - lastPointerX;
+            panOffsetY += event.clientY - lastPointerY;
+            lastPointerX = event.clientX;
+            lastPointerY = event.clientY;
+            applyPanOffset();
+        }, true);
+
+        const endDrag = (event) => {
+            if (dragPointerId === null || event.pointerId !== dragPointerId) {
+                return;
+            }
+            dragPointerId = null;
+            // The offset stays until the URL catches up and renders drain it to
+            // zero. Clearing it here would snap the heat off the map again.
+            requestRender();
+        };
+        window.addEventListener("pointerup", endDrag, true);
+        window.addEventListener("pointercancel", endDrag, true);
+    }
+
     function installHotkeys() {
         window.addEventListener(
             "keydown",
@@ -1204,6 +1313,7 @@
 
     // ---- Boot ----------------------------------------------------------------
     installObservers();
+    installDragFollow();
     installHotkeys();
     requestRender();
 })();
