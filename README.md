@@ -1,7 +1,7 @@
 # Heatmapy — Strava Heatmap for Mapy.com
 
 Overlay your **Strava heatmaps** on [Mapy.com](https://mapy.com) — the **global
-heatmap split by sport** (MTB / Gravel / Road / Run, in *hot*) plus your own **personal
+heatmap split by sport** (MTB / Gravel / Road / Run / Trail Run, in *hot*) plus your own **personal
 heatmap** (in blue), shown together over the real map. Find the roads and trails
 you've never ridden or run yet — on the map with the best route planning around.
 
@@ -24,7 +24,7 @@ account in one click (always private and starred). From there it flows to your
 The **global** heat shows where everyone goes; your **personal** heat (blue) shows
 where *you've* already been. Together they make the good lines obvious — and the
 ones you still haven't explored. That's the whole point of planning. Per-sport
-**MTB / Gravel / Road / Run** layers mean it's not just for cyclists. And Mapy.com's
+**MTB / Gravel / Road / Run / Trail Run** layers mean it's not just for cyclists. And Mapy.com's
 outdoor + aerial maps and route planner beat the usual map apps for this.
 
 You need to be **logged in to Strava** in the same browser. A **Strava Subscription**
@@ -55,7 +55,7 @@ profile URL).
 
 On-map panel (bottom-left):
 
-- **Sport** — pick the discipline: **Road / MTB / Gravel / Run**. Both layers follow it.
+- **Sport** — pick the discipline: **Road / MTB / Gravel / Run / Trail**. Both layers follow it.
 - **Global** — independent on/off for the crowd heatmap.
 - **Personal** — independent on/off for *your* heatmap.
 - **⏻** — master mute: hides everything at once (your per-layer choices are

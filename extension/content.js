@@ -26,9 +26,10 @@
         gravel: "sport_GravelRide",
         ride: "sport_Ride",
         run: "sport_Run",
+        trail: "sport_TrailRun",
     };
-    const SPORT_LABEL = { mtb: "MTB", gravel: "Gravel", ride: "Road", run: "Run" };
-    const SPORT_ORDER = ["ride", "mtb", "gravel", "run"]; // Road, MTB, Gravel, Run
+    const SPORT_LABEL = { mtb: "MTB", gravel: "Gravel", ride: "Road", run: "Run", trail: "Trail" };
+    const SPORT_ORDER = ["ride", "mtb", "gravel", "run", "trail"]; // Road, MTB, Gravel, Run, Trail Run
     const MIN_ZOOM = 0;
     const MAX_ZOOM = 22;
     const GLOBAL_TILE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
@@ -321,24 +322,73 @@
 
     // ---- Tile fetch (via service worker, with Strava cookies) ----------------
     const STRAVA_HEATMAP_URL = "https://www.strava.com/maps/global-heatmap";
-    let authNotifiedAt = 0;
-    function noteAuthFailure() {
-        const now = Date.now();
-        if (now - authNotifiedAt < 60000) {
+    // Tile 401/403s mean two different things, and they need different UI
+    // (issues #2, #7 — a 9s toast was easy to miss, and with no Strava login
+    // the extension looked simply broken):
+    //  - no login at all -> NOTHING loads; show a persistent banner that stays
+    //    until a tile actually loads (cleared in loadTile), with retries on
+    //    tab focus so it disappears by itself right after the user logs in;
+    //  - logged in without a subscription -> only detail past ~2 km scale and
+    //    the personal heat are gated; a throttled transient toast is enough.
+    let loginBanner = null;
+    let subNotifiedAt = 0;
+    // kind/z disambiguate a stored athleteId whose session has expired: a free
+    // logged-in account CAN load global tiles at z<=11, so a global 401/403
+    // there means the login itself is gone -> banner, not the sub toast.
+    function noteAuthFailure(kind, z) {
+        if (athleteId && (kind === "personal" || z > 11)) {
+            const now = Date.now();
+            if (now - subNotifiedAt < 60000) {
+                return;
+            }
+            subNotifiedAt = now;
+            toast(
+                "Heatmap detail past ~2 km map scale (and the personal heatmap) " +
+                "needs a Strava subscription — zoom out to keep the free global heat."
+            );
             return;
         }
-        authNotifiedAt = now;
-        const el = document.createElement("div");
-        el.className = "msh-toast msh-toast--link";
-        el.innerHTML =
-            "Strava heatmap needs you logged in " +
-            "(Subscription for zoom &gt; 11 / personal).<br>" +
-            '<a href="' + STRAVA_HEATMAP_URL + '" target="_blank" rel="noopener noreferrer">' +
-            "Open Strava heatmap ↗</a> — then reload this page.";
-        positionToastAbovePanel(el);
-        document.body.appendChild(el);
-        window.setTimeout(() => el.remove(), 9000);
+        showLoginBanner();
     }
+    function showLoginBanner() {
+        if (loginBanner) {
+            return;
+        }
+        loginBanner = document.createElement("div");
+        loginBanner.id = "msh-login-banner";
+        loginBanner.innerHTML =
+            '<button class="msh-login-banner__close" ' +
+            'title="Hide and turn Heatmapy off (press A to turn it back on)">×</button>' +
+            "<b>Heatmapy needs a Strava login</b>" +
+            "Log in to Strava in this browser to load the heatmap. A free account " +
+            "shows the global heat down to ~2&nbsp;km map scale; a subscription " +
+            "unlocks full detail and your personal heatmap." +
+            '<br><a href="' + STRAVA_HEATMAP_URL + '" target="_blank" rel="noopener noreferrer">' +
+            "Log in on strava.com ↗</a>";
+        loginBanner.querySelector(".msh-login-banner__close").addEventListener("click", () => {
+            clearLoginBanner();
+            if (!masterOff) {
+                masterToggle(); // dismissing = "not now": stop fetching (and failing)
+            }
+        });
+        document.body.appendChild(loginBanner);
+    }
+    function clearLoginBanner() {
+        if (loginBanner) {
+            loginBanner.remove();
+            loginBanner = null;
+        }
+    }
+    // The user logs in on strava.com in another tab and comes back: retry the
+    // tiles so the banner clears on its own, no manual reload needed.
+    function retryAfterLogin() {
+        if (loginBanner && !document.hidden) {
+            lastStateKey = "";
+            requestRender();
+        }
+    }
+    document.addEventListener("visibilitychange", retryAfterLogin);
+    window.addEventListener("focus", retryAfterLogin);
     function fetchTileViaSW(url) {
         return new Promise((resolve) => {
             try {
@@ -460,10 +510,13 @@
                 }
                 if (!res.ok || !res.blob) {
                     if (res.status === 401 || res.status === 403) {
-                        noteAuthFailure();
+                        noteAuthFailure(layer.kind, z);
                     }
                     return;
                 }
+                // A tile came back over the network -> the Strava session works
+                // (logged out, every tile 403s), so the login nag is done.
+                clearLoginBanner();
                 if (layer.kind === "personal") {
                     const recolored = await recolorToBlue(res.blob);
                     if (seq !== renderSeq) {
@@ -497,7 +550,10 @@
                 width: "0px",
                 height: "0px",
                 pointerEvents: "none",
-                zIndex: "2147483646",
+                // Above Mapy's tile canvas (whose container is z-index 1) but
+                // below all Mapy UI: controls/dialog covers sit at z 300-302,
+                // so the heat never covers a dialog (issue #4) or the controls.
+                zIndex: "2",
                 opacity: String(clamp(opacity / 100, 0, 1)),
                 display: "block",
             });
@@ -1073,7 +1129,7 @@
         }
         const h = panel.getBoundingClientRect().height || panel.offsetHeight || 0;
         if (h) {
-            el.style.bottom = 12 + h + 8 + "px"; // panel bottom + height + gap
+            el.style.bottom = 48 + h + 8 + "px"; // panel bottom + height + gap
         }
     }
     function toast(message) {
