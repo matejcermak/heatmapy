@@ -49,7 +49,7 @@ const TARGETS = {
         m.permissions = [...m.permissions, "webRequest", "webRequestBlocking"];
         m.browser_specific_settings = {
             gecko: {
-                id: "heatmapy@matejcermak.github.io",
+                id: "heatmapy@heatmapy.com",
                 strict_min_version: "128.0",
                 data_collection_permissions: { required: ["none"] },
             },

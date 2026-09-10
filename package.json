@@ -1,6 +1,6 @@
 {
   "name": "heatmapy",
-  "version": "1.3.8",
+  "version": "1.4.0",
   "description": "Overlay your Strava global and personal heatmaps on Mapy.com, and send planned routes to Strava.",
   "private": true,
   "type": "module",
@@ -12,6 +12,6 @@
     "lint:firefox": "npm run build:firefox && npx --yes web-ext@8 lint --source-dir dist/firefox",
     "start:firefox": "npm run build:firefox && npx --yes web-ext@8 run --source-dir dist/firefox --start-url https://mapy.com/"
   },
-  "author": "Matyáš Strelec",
+  "author": "Matěj Čermák",
   "license": "MIT"
 }
