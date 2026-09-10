@@ -4,18 +4,18 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Heatmapy — Strava heatmaps on Mapy.com</title>
-<meta name="description" content="Free Chrome extension: overlay your Strava global and personal heatmaps (MTB / Ride / Run) on Mapy.com — the best map for route planning. Discover roads you've never explored." />
+<meta name="description" content="Free Chrome &amp; Firefox extension: overlay your Strava global and personal heatmaps (MTB / Ride / Run) on Mapy.com — the best map for route planning. Discover roads you've never explored." />
 <link rel="canonical" href="https://heatmapy.com/" />
 <!-- Open Graph / Twitter card for link previews when shared -->
 <meta property="og:type" content="website" />
 <meta property="og:site_name" content="Heatmapy" />
 <meta property="og:title" content="Heatmapy — Strava heatmaps on Mapy.com" />
-<meta property="og:description" content="Free Chrome extension: overlay your Strava global and personal heatmaps (MTB / Ride / Run) on Mapy.com — the best map for route planning." />
+<meta property="og:description" content="Free Chrome &amp; Firefox extension: overlay your Strava global and personal heatmaps (MTB / Ride / Run) on Mapy.com — the best map for route planning." />
 <meta property="og:url" content="https://heatmapy.com/" />
 <meta property="og:image" content="https://heatmapy.com/img/hero.png?v=2" />
 <meta name="twitter:card" content="summary_large_image" />
 <meta name="twitter:title" content="Heatmapy — Strava heatmaps on Mapy.com" />
-<meta name="twitter:description" content="Overlay your Strava global & personal heatmaps on Mapy.com for route planning. Free Chrome extension." />
+<meta name="twitter:description" content="Overlay your Strava global & personal heatmaps on Mapy.com for route planning. Free Chrome & Firefox extension." />
 <meta name="twitter:image" content="https://heatmapy.com/img/hero.png?v=2" />
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'><rect width='40' height='40' rx='11' fill='%2315151a'/><path d='M7 27C16 20 17 12 24 10 31 8 33 19 38 13' fill='none' stroke='%23fc5200' stroke-width='4.5' stroke-linecap='round'/><path d='M6 33C16 30 22 22 28 23 34 24 35 31 39 29' fill='none' stroke='%231e90ff' stroke-width='3.4' stroke-linecap='round'/></svg>" />
 <style>
@@ -217,6 +217,13 @@
             <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 0 1 8.66 5H12a5 5 0 0 0-4.33 2.5L4.2 4.8A10 10 0 0 1 12 2Zm9.5 6.5A10 10 0 0 1 12 22l4.33-7.5A5 5 0 0 0 12 7h9.5ZM2.5 6.6 6.83 14A5 5 0 0 0 12 17l-1.7 5A10 10 0 0 1 2.5 6.6ZM12 9a3 3 0 1 1 0 6 3 3 0 0 1 0-6Z"/></svg>
             <span data-i18n="cta.chromeShort">Extension (Free)</span>
         </a>
+        <!-- Firefox twin of the button above; the script at the bottom shows exactly
+             one of the two. Keeps .btn--chrome for identical styling (incl. the
+             narrow-screen rule that hides the icon) — data-cta is what differs. -->
+        <a class="btn btn--chrome btn--sm" href="#get" data-cta="firefox" hidden>
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M20.5 11H19V7a2 2 0 0 0-2-2h-4V3.5a2.5 2.5 0 0 0-5 0V5H4a2 2 0 0 0-2 2v3.8h1.5a2.2 2.2 0 0 1 0 4.4H2V19a2 2 0 0 0 2 2h3.8v-1.5a2.2 2.2 0 0 1 4.4 0V21H17a2 2 0 0 0 2-2v-4h1.5a2.5 2.5 0 0 0 0-5Z"/></svg>
+            <span data-i18n="cta.firefoxShort">Add-on (Free)</span>
+        </a>
         <a href="#" class="lang-switch" data-lang-toggle aria-label="Switch language">EN</a>
     </div>
 </header>
@@ -233,6 +240,10 @@
                 <a class="btn btn--chrome" href="#" data-cta="chrome">
                     <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 0 1 8.66 5H12a5 5 0 0 0-4.33 2.5L4.2 4.8A10 10 0 0 1 12 2Zm9.5 6.5A10 10 0 0 1 12 22l4.33-7.5A5 5 0 0 0 12 7h9.5ZM2.5 6.6 6.83 14A5 5 0 0 0 12 17l-1.7 5A10 10 0 0 1 2.5 6.6ZM12 9a3 3 0 1 1 0 6 3 3 0 0 1 0-6Z"/></svg>
                     <span data-i18n="cta.chrome">Chrome Extension (Free)</span>
+                </a>
+                <a class="btn btn--chrome" href="#" data-cta="firefox" hidden>
+                    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M20.5 11H19V7a2 2 0 0 0-2-2h-4V3.5a2.5 2.5 0 0 0-5 0V5H4a2 2 0 0 0-2 2v3.8h1.5a2.2 2.2 0 0 1 0 4.4H2V19a2 2 0 0 0 2 2h3.8v-1.5a2.2 2.2 0 0 1 4.4 0V21H17a2 2 0 0 0 2-2v-4h1.5a2.5 2.5 0 0 0 0-5Z"/></svg>
+                    <span data-i18n="cta.firefox">Firefox Add-on (Free)</span>
                 </a>
                 <a class="btn btn--coffee" href="#" data-cta="coffee" data-i18n="cta.coffee">☕ Buy me a coffee</a>
                 <a class="btn btn--ghost" href="https://github.com/matejcermak/heatmapy" target="_blank" rel="noopener">
@@ -340,9 +351,20 @@
 </footer>
 
 <script>
-    // ===== Edit these two links when ready =====
+    // ===== Edit these links when ready =====
     const CHROME_URL = "https://chromewebstore.google.com/detail/pkifpafiblikmgkcpkbdjmoapjnladok"; // live once review passes
+    // TODO: swap for the addons.mozilla.org listing once it's approved. Until then
+    // this points at the repo's Firefox install instructions (build + load).
+    const FIREFOX_URL = "https://github.com/matejcermak/heatmapy#firefox";
     document.querySelectorAll('[data-cta="chrome"]').forEach((a) => { a.href = CHROME_URL; a.target = "_blank"; a.rel = "noopener"; });
+    document.querySelectorAll('[data-cta="firefox"]').forEach((a) => { a.href = FIREFOX_URL; a.target = "_blank"; a.rel = "noopener"; });
+
+    // Show the add-on button to Firefox (and its forks — Zen, LibreWolf, Waterfox all
+    // keep "Gecko/… Firefox/…" in the UA), the Chrome one to everybody else. Both
+    // exist in the DOM, so no-JS visitors still see the Chrome button.
+    const IS_GECKO = /\bFirefox\/\d/.test(navigator.userAgent) && !/Seamonkey\//.test(navigator.userAgent);
+    document.querySelectorAll('[data-cta="chrome"]').forEach((a) => { a.hidden = IS_GECKO; });
+    document.querySelectorAll('[data-cta="firefox"]').forEach((a) => { a.hidden = !IS_GECKO; });
 
     // ===== Donations =====
     // Stripe Adaptive Pricing does NOT convert pay-what-you-want / custom-amount links — they
@@ -383,6 +405,8 @@
         'nav.why': `Proč Mapy`,
         'cta.chrome': `Rozšíření do Chromu (zdarma)`,
         'cta.chromeShort': `Rozšíření (zdarma)`,
+        'cta.firefox': `Rozšíření do Firefoxu (zdarma)`,
+        'cta.firefoxShort': `Rozšíření (zdarma)`,
         'cta.coffee': `☕ Kup mi kafe`,
         'cta.github': `Zobrazit na GitHubu`,
         'hero.h1': `Strava heatmapy na mapě, která <span class="g">se fakt hodí na plánování</span>.`,

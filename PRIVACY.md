@@ -2,8 +2,8 @@
 
 _Last updated: 2026-06-25_
 
-This Chrome extension overlays your Strava heatmaps on Mapy.com. It is designed to
-keep your data on your own machine.
+This browser extension (Chrome and Firefox) overlays your Strava heatmaps on
+Mapy.com. It is designed to keep your data on your own machine.
 
 ## What it accesses
 
@@ -26,7 +26,8 @@ keep your data on your own machine.
 ## What it stores (locally, on your device only)
 
 - Your settings (which layers are on, opacity) — in the page's local storage.
-- Your athlete ID — in the extension's local storage (`chrome.storage.local`).
+- Your athlete ID — in the extension's own local storage (the WebExtension
+  `storage.local` area).
 - A cache of heatmap image tiles — in your browser's IndexedDB, to make the map
   fast and reduce repeated requests. You can clear it any time via the browser.
 

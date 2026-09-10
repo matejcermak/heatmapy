@@ -8,7 +8,10 @@
 (function () {
     "use strict";
 
-    if (!window.chrome || !chrome.runtime || !chrome.runtime.id) {
+    // Promise-based extension APIs: `browser` in Firefox, `chrome` in Chrome MV3.
+    // (Firefox also exposes a callback-only `chrome`, so don't use that one.)
+    const api = globalThis.browser?.runtime?.id ? globalThis.browser : globalThis.chrome;
+    if (!api || !api.runtime || !api.runtime.id) {
         return; // not running as an extension content script
     }
 
@@ -127,19 +130,23 @@
             renderPanel();
         }
     }
-    try {
-        chrome.storage.local.get("stravaAthleteId", (res) => {
+    (async () => {
+        try {
+            const res = await api.storage.local.get("stravaAthleteId");
             if (res && res.stravaAthleteId) {
                 applyAthleteId(res.stravaAthleteId);
             }
             // Ask the worker to (re)detect in the background.
-            chrome.runtime.sendMessage({ type: "detectAthlete" }, (r) => {
-                if (!chrome.runtime.lastError && r && r.ok && r.athleteId) {
-                    applyAthleteId(r.athleteId);
-                }
-            });
-        });
-        chrome.storage.onChanged.addListener((changes, area) => {
+            const r = await api.runtime.sendMessage({ type: "detectAthlete" });
+            if (r && r.ok && r.athleteId) {
+                applyAthleteId(r.athleteId);
+            }
+        } catch (_) {
+            // ignore
+        }
+    })();
+    try {
+        api.storage.onChanged.addListener((changes, area) => {
             if (area === "local" && changes.stravaAthleteId) {
                 applyAthleteId(changes.stravaAthleteId.newValue || "");
             }
@@ -389,29 +396,47 @@
     }
     document.addEventListener("visibilitychange", retryAfterLogin);
     window.addEventListener("focus", retryAfterLogin);
-    function fetchTileViaSW(url) {
-        return new Promise((resolve) => {
+    // Firefox lets the user revoke the strava.com host permission at any time; the
+    // background worker reports that back so we can say what to actually do.
+    let permNotifiedAt = 0;
+    function notePermissionMissing() {
+        const now = Date.now();
+        if (now - permNotifiedAt < 60000) {
+            return;
+        }
+        permNotifiedAt = now;
+        const el = document.createElement("div");
+        el.className = "msh-toast";
+        el.textContent =
+            "Heatmapy needs permission to access strava.com — click the Heatmapy " +
+            "toolbar icon and grant access, then reload this page.";
+        positionToastAbovePanel(el);
+        document.body.appendChild(el);
+        window.setTimeout(() => el.remove(), 9000);
+    }
+    async function fetchTileViaSW(url) {
+        let resp;
+        try {
+            resp = await api.runtime.sendMessage({ type: "fetchTile", url });
+        } catch (_) {
+            return { ok: false, status: 0 };
+        }
+        if (!resp) {
+            return { ok: false, status: 0 };
+        }
+        if (resp.needPermission) {
+            notePermissionMissing();
+            return { ok: false, status: 0 };
+        }
+        if (resp.ok && resp.dataUrl) {
             try {
-                chrome.runtime.sendMessage({ type: "fetchTile", url }, async (resp) => {
-                    if (chrome.runtime.lastError || !resp) {
-                        resolve({ ok: false, status: 0 });
-                        return;
-                    }
-                    if (resp.ok && resp.dataUrl) {
-                        try {
-                            const blob = await (await fetch(resp.dataUrl)).blob();
-                            resolve({ ok: true, status: resp.status, blob });
-                        } catch (_) {
-                            resolve({ ok: false, status: resp.status || 0 });
-                        }
-                    } else {
-                        resolve({ ok: false, status: resp.status || 0 });
-                    }
-                });
+                const blob = await (await fetch(resp.dataUrl)).blob();
+                return { ok: true, status: resp.status, blob };
             } catch (_) {
-                resolve({ ok: false, status: 0 });
+                return { ok: false, status: resp.status || 0 };
             }
-        });
+        }
+        return { ok: false, status: resp.status || 0 };
     }
 
     // Personal tiles arrive opaque-black with grayscale heat; key black ->
@@ -1097,7 +1122,7 @@
                 toast("Couldn't get the route — plan one on Mapy first (⌘/Ctrl-click to add points), then try again.");
                 return;
             }
-            const res = await chrome.runtime.sendMessage({
+            const res = await api.runtime.sendMessage({
                 type: "uploadStravaRoute",
                 gpx: g.gpx,
                 name: composeRouteName(g.gpx),
@@ -1105,6 +1130,8 @@
             });
             if (res && res.ok) {
                 toast("Synced to Strava ✓ (starred) — it'll appear on your connected Garmin/Wahoo on the next device sync.");
+            } else if (res && res.needPermission) {
+                toast("Heatmapy needs permission to access strava.com — click the Heatmapy toolbar icon and grant access.");
             } else if (res && res.needLogin) {
                 toast("Log in to Strava (Subscriber) in this browser to send routes.");
             } else {
