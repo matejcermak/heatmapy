@@ -4,18 +4,18 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Heatmapy — Strava heatmaps on Mapy.com</title>
-<meta name="description" content="Free Chrome &amp; Firefox extension: overlay your Strava global and personal heatmaps (MTB / Ride / Run) on Mapy.com — the best map for route planning. Discover roads you've never explored." />
+<meta name="description" content="Free extension for Chrome and Firefox. It shows Strava's global and personal heatmaps on Mapy.com for road, MTB, gravel, running and trail running, and sends routes you plan there to Strava." />
 <link rel="canonical" href="https://heatmapy.com/" />
 <!-- Open Graph / Twitter card for link previews when shared -->
 <meta property="og:type" content="website" />
 <meta property="og:site_name" content="Heatmapy" />
 <meta property="og:title" content="Heatmapy — Strava heatmaps on Mapy.com" />
-<meta property="og:description" content="Free Chrome &amp; Firefox extension: overlay your Strava global and personal heatmaps (MTB / Ride / Run) on Mapy.com — the best map for route planning." />
+<meta property="og:description" content="Free extension for Chrome and Firefox. It shows Strava's global and personal heatmaps on Mapy.com, so you can plan routes on a detailed outdoor map." />
 <meta property="og:url" content="https://heatmapy.com/" />
 <meta property="og:image" content="https://heatmapy.com/img/hero.png?v=2" />
 <meta name="twitter:card" content="summary_large_image" />
 <meta name="twitter:title" content="Heatmapy — Strava heatmaps on Mapy.com" />
-<meta name="twitter:description" content="Overlay your Strava global & personal heatmaps on Mapy.com for route planning. Free Chrome & Firefox extension." />
+<meta name="twitter:description" content="Strava's global and personal heatmaps on Mapy.com. Free extension for Chrome and Firefox." />
 <meta name="twitter:image" content="https://heatmapy.com/img/hero.png?v=2" />
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'><rect width='40' height='40' rx='11' fill='%2315151a'/><path d='M7 27C16 20 17 12 24 10 31 8 33 19 38 13' fill='none' stroke='%23fc5200' stroke-width='4.5' stroke-linecap='round'/><path d='M6 33C16 30 22 22 28 23 34 24 35 31 39 29' fill='none' stroke='%231e90ff' stroke-width='3.4' stroke-linecap='round'/></svg>" />
 <style>
@@ -90,7 +90,7 @@
         background: #fff; border: 1px solid #ffd9c7; border-radius: 999px;
         padding: 5px 13px; margin-bottom: 18px;
     }
-    h1 { font-size: clamp(32px, 5.2vw, 52px); line-height: 1.05; letter-spacing: -0.03em; margin: 0 auto 16px; max-width: 13ch; }
+    h1 { font-size: clamp(32px, 5.2vw, 52px); line-height: 1.05; letter-spacing: -0.03em; margin: 0 auto 16px; max-width: 20ch; text-wrap: balance; }
     h1 .g { background: linear-gradient(90deg, var(--orange), #ff8a3d); -webkit-background-clip: text; background-clip: text; color: transparent; }
     .sub { font-size: clamp(16px, 2.2vw, 19px); color: var(--muted); max-width: 660px; margin: 0 auto 26px; }
     /* heatmap wording: global/generic = bold orange, personal = bold blue */
@@ -205,6 +205,9 @@
         <path d="M7 27 C16 20, 17 12, 24 10 C31 8, 33 19, 38 13" fill="none" stroke="url(#hot)" stroke-width="4.5" stroke-linecap="round"/>
         <path d="M6 33 C16 30, 22 22, 28 23 C34 24, 35 31, 39 29" fill="none" stroke="#1e90ff" stroke-width="3.4" stroke-linecap="round"/>
     </symbol>
+    <!-- browser logos for the install buttons (Simple Icons, CC0) -->
+    <path id="ic-chrome" d="M12 0C8.21 0 4.831 1.757 2.632 4.501l3.953 6.848A5.454 5.454 0 0 1 12 6.545h10.691A12 12 0 0 0 12 0zM1.931 5.47A11.943 11.943 0 0 0 0 12c0 6.012 4.42 10.991 10.189 11.864l3.953-6.847a5.45 5.45 0 0 1-6.865-2.29zm13.342 2.166a5.446 5.446 0 0 1 1.45 7.09l.002.001h-.002l-5.344 9.257c.206.01.413.016.621.016 6.627 0 12-5.373 12-12 0-1.54-.29-3.011-.818-4.364zM12 16.364a4.364 4.364 0 1 1 0-8.728 4.364 4.364 0 0 1 0 8.728Z"/>
+    <path id="ic-firefox" d="M8.824 7.287c.008 0 .004 0 0 0zm-2.8-1.4c.006 0 .003 0 0 0zm16.754 2.161c-.505-1.215-1.53-2.528-2.333-2.943.654 1.283 1.033 2.57 1.177 3.53l.002.02c-1.314-3.278-3.544-4.6-5.366-7.477-.091-.147-.184-.292-.273-.446a3.545 3.545 0 01-.13-.24 2.118 2.118 0 01-.172-.46.03.03 0 00-.027-.03.038.038 0 00-.021 0l-.006.001a.037.037 0 00-.01.005L15.624 0c-2.585 1.515-3.657 4.168-3.932 5.856a6.197 6.197 0 00-2.305.587.297.297 0 00-.147.37c.057.162.24.24.396.17a5.622 5.622 0 012.008-.523l.067-.005a5.847 5.847 0 011.957.222l.095.03a5.816 5.816 0 01.616.228c.08.036.16.073.238.112l.107.055a5.835 5.835 0 01.368.211 5.953 5.953 0 012.034 2.104c-.62-.437-1.733-.868-2.803-.681 4.183 2.09 3.06 9.292-2.737 9.02a5.164 5.164 0 01-1.513-.292 4.42 4.42 0 01-.538-.232c-1.42-.735-2.593-2.121-2.74-3.806 0 0 .537-2 3.845-2 .357 0 1.38-.998 1.398-1.287-.005-.095-2.029-.9-2.817-1.677-.422-.416-.622-.616-.8-.767a3.47 3.47 0 00-.301-.227 5.388 5.388 0 01-.032-2.842c-1.195.544-2.124 1.403-2.8 2.163h-.006c-.46-.584-.428-2.51-.402-2.913-.006-.025-.343.176-.389.206-.406.29-.787.616-1.136.974-.397.403-.76.839-1.085 1.303a9.816 9.816 0 00-1.562 3.52c-.003.013-.11.487-.19 1.073-.013.09-.026.181-.037.272a7.8 7.8 0 00-.069.667l-.002.034-.023.387-.001.06C.386 18.795 5.593 24 12.016 24c5.752 0 10.527-4.176 11.463-9.661.02-.149.035-.298.052-.448.232-1.994-.025-4.09-.753-5.844z"/>
 </defs></svg>
 
 <header>
@@ -214,15 +217,14 @@
         <a class="ghost hide-sm" href="#why" data-i18n="nav.why">Why Mapy</a>
         <a class="ghost hide-sm" href="#compare">Mapy.com vs Strava</a>
         <a class="btn btn--chrome btn--sm" href="#get" data-cta="chrome">
-            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 0 1 8.66 5H12a5 5 0 0 0-4.33 2.5L4.2 4.8A10 10 0 0 1 12 2Zm9.5 6.5A10 10 0 0 1 12 22l4.33-7.5A5 5 0 0 0 12 7h9.5ZM2.5 6.6 6.83 14A5 5 0 0 0 12 17l-1.7 5A10 10 0 0 1 2.5 6.6ZM12 9a3 3 0 1 1 0 6 3 3 0 0 1 0-6Z"/></svg>
-            <span data-i18n="cta.chromeShort">Extension (Free)</span>
+            <svg viewBox="0 0 24 24" fill="currentColor"><use href="#ic-chrome"/></svg>
+            <span>Chrome</span>
         </a>
-        <!-- Firefox twin of the button above; the script at the bottom shows exactly
-             one of the two. Keeps .btn--chrome for identical styling (incl. the
-             narrow-screen rule that hides the icon) — data-cta is what differs. -->
-        <a class="btn btn--chrome btn--sm" href="#get" data-cta="firefox" hidden>
-            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M20.5 11H19V7a2 2 0 0 0-2-2h-4V3.5a2.5 2.5 0 0 0-5 0V5H4a2 2 0 0 0-2 2v3.8h1.5a2.2 2.2 0 0 1 0 4.4H2V19a2 2 0 0 0 2 2h3.8v-1.5a2.2 2.2 0 0 1 4.4 0V21H17a2 2 0 0 0 2-2v-4h1.5a2.5 2.5 0 0 0 0-5Z"/></svg>
-            <span data-i18n="cta.firefoxShort">Add-on (Free)</span>
+        <!-- Firefox twin of the button above. Keeps .btn--chrome for identical styling
+             (incl. the narrow-screen rule that hides the icon); data-cta is what differs. -->
+        <a class="btn btn--chrome btn--sm" href="#get" data-cta="firefox">
+            <svg viewBox="0 0 24 24" fill="currentColor"><use href="#ic-firefox"/></svg>
+            <span>Firefox</span>
         </a>
         <a href="#" class="lang-switch" data-lang-toggle aria-label="Switch language">EN</a>
     </div>
@@ -232,18 +234,18 @@
     <!-- HERO -->
     <section class="hero">
         <div class="wrap">
-            <h1 data-i18n="hero.h1">Strava heatmaps, on the map that's <span class="g">actually good at planning</span>.</h1>
-            <p class="sub" data-i18n="hero.sub">Overlay <a class="strava-link" href="https://www.strava.com/maps/global-heatmap" target="_blank" rel="noopener">Strava</a>'s <span class="hm">global heatmap</span> and your
-                <span class="hmp">personal heatmap</span> on <a class="mapy-link" href="https://mapy.com" target="_blank" rel="noopener">Mapy.com</a> —
-                switch 🚴 Road / 🚵 MTB / 🌄 Gravel / 🏃 Running maps, plan your route, and <b>sync it straight to Strava</b> → your Garmin or Wahoo.</p>
+            <h1 data-i18n="hero.h1">Strava heatmaps on <span class="g">Mapy.com</span></h1>
+            <p class="sub" data-i18n="hero.sub">See <a class="strava-link" href="https://www.strava.com/maps/global-heatmap" target="_blank" rel="noopener">Strava</a>'s <span class="hm">global heatmap</span> and your
+                <span class="hmp">personal heatmap</span> on <a class="mapy-link" href="https://mapy.com" target="_blank" rel="noopener">Mapy.com</a>,
+                for road, MTB, gravel, running or trail running. Plan a route, <b>send it to Strava</b>, and it syncs to your Garmin or Wahoo from there.</p>
             <div class="cta-row">
                 <a class="btn btn--chrome" href="#" data-cta="chrome">
-                    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 0 1 8.66 5H12a5 5 0 0 0-4.33 2.5L4.2 4.8A10 10 0 0 1 12 2Zm9.5 6.5A10 10 0 0 1 12 22l4.33-7.5A5 5 0 0 0 12 7h9.5ZM2.5 6.6 6.83 14A5 5 0 0 0 12 17l-1.7 5A10 10 0 0 1 2.5 6.6ZM12 9a3 3 0 1 1 0 6 3 3 0 0 1 0-6Z"/></svg>
-                    <span data-i18n="cta.chrome">Chrome Extension (Free)</span>
+                    <svg viewBox="0 0 24 24" fill="currentColor"><use href="#ic-chrome"/></svg>
+                    <span>Chrome</span>
                 </a>
-                <a class="btn btn--chrome" href="#" data-cta="firefox" hidden>
-                    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M20.5 11H19V7a2 2 0 0 0-2-2h-4V3.5a2.5 2.5 0 0 0-5 0V5H4a2 2 0 0 0-2 2v3.8h1.5a2.2 2.2 0 0 1 0 4.4H2V19a2 2 0 0 0 2 2h3.8v-1.5a2.2 2.2 0 0 1 4.4 0V21H17a2 2 0 0 0 2-2v-4h1.5a2.5 2.5 0 0 0 0-5Z"/></svg>
-                    <span data-i18n="cta.firefox">Firefox Add-on (Free)</span>
+                <a class="btn btn--chrome" href="#" data-cta="firefox">
+                    <svg viewBox="0 0 24 24" fill="currentColor"><use href="#ic-firefox"/></svg>
+                    <span>Firefox</span>
                 </a>
                 <a class="btn btn--coffee" href="#" data-cta="coffee" data-i18n="cta.coffee">☕ Buy me a coffee</a>
                 <a class="btn btn--ghost" href="https://github.com/matejcermak/heatmapy" target="_blank" rel="noopener">
@@ -253,16 +255,16 @@
             </div>
             <div class="maintain">
                 <span class="dot-pulse" aria-hidden="true"></span>
-                <span data-i18n="hero.maintain"><b>Actively maintained.</b> I fix bugs and ship improvements regularly — hit one, or have an idea?
-                    <a href="https://github.com/matejcermak/heatmapy/issues" target="_blank" rel="noopener">Open a GitHub issue →</a></span>
+                <span data-i18n="hero.maintain"><b>Actively maintained.</b> If something breaks or you're missing a feature,
+                    <a href="https://github.com/matejcermak/heatmapy/issues" target="_blank" rel="noopener">let me know on GitHub</a>.</span>
             </div>
 
             <div class="video">
                 <video src="img/hero-demo.mp4?v=2" poster="img/hero.png?v=2" autoplay muted loop playsinline
-                       aria-label="Strava heatmap overlaid on Mapy.com — live demo"></video>
+                       aria-label="Demo: Strava heatmap on Mapy.com"></video>
             </div>
-            <p class="video-cap" data-i18n="hero.videocap"><span class="hm">Global MTB heatmap</span> + your <span class="hmp">personal heatmap</span></p>
-            <p class="sub-note" data-i18n="hero.subnote">Free to use. The global heatmap above zoom 11, your <span class="hmp">personal heatmap</span>, and <b>Sync to Strava</b> need a <a class="strava-link" href="https://www.strava.com/maps/global-heatmap" target="_blank" rel="noopener">Strava</a> subscription.</p>
+            <p class="video-cap" data-i18n="hero.videocap"><span class="hm">Global MTB heatmap</span> and your <span class="hmp">personal heatmap</span></p>
+            <p class="sub-note" data-i18n="hero.subnote">The extension is free. The global heatmap above zoom 11, your <span class="hmp">personal heatmap</span> and the <b>Sync to Strava</b> button need a <a class="strava-link" href="https://www.strava.com/maps/global-heatmap" target="_blank" rel="noopener">Strava</a> subscription.</p>
         </div>
     </section>
 
@@ -270,29 +272,29 @@
     <section class="block soft" id="why">
         <div class="wrap">
             <div class="kicker" data-i18n="why.kicker">Why Mapy.com</div>
-            <h2 data-i18n="why.h2">A map built for the outdoors — and for planning</h2>
-            <p class="lead" data-i18n="why.lead"><a class="strava-link" href="https://www.strava.com/maps/global-heatmap" target="_blank" rel="noopener">Strava</a>'s base map is thin. <a class="mapy-link" href="https://mapy.com" target="_blank" rel="noopener">Mapy.com</a>'s outdoor map shows what actually matters when you're
-                choosing where to go.</p>
+            <h2 data-i18n="why.h2">Terrain, trails and closures on one map</h2>
+            <p class="lead" data-i18n="why.lead"><a class="strava-link" href="https://www.strava.com/maps/global-heatmap" target="_blank" rel="noopener">Strava</a>'s map is fine for looking at your activities, but it shows too little for planning.
+                The <a class="mapy-link" href="https://mapy.com" target="_blank" rel="noopener">Mapy.com</a> outdoor map shows terrain, small paths and surfaces.</p>
             <div class="grid">
                 <div class="card">
                     <div class="ic ic-o">⛰️</div>
-                    <h3 data-i18n="why.c1h">See the terrain</h3>
-                    <p data-i18n="why.c1p">Gradient shading and contours — tell at a glance if it's hilly, forested, or flat, before you commit.</p>
+                    <h3 data-i18n="why.c1h">Hill shading and contours</h3>
+                    <p data-i18n="why.c1p">See where the hills, forests and open fields are before you set off.</p>
                 </div>
                 <div class="card">
                     <div class="ic ic-o">🛤️</div>
-                    <h3 data-i18n="why.c2h">Every path that exists</h3>
-                    <p data-i18n="why.c2p">From motorways to the tiniest forest singletrack in the middle of nowhere — and you can tell which is which.</p>
+                    <h3 data-i18n="why.c2h">Even the smallest paths</h3>
+                    <p data-i18n="why.c2p">From motorways to narrow forest singletrack. Each type of road or path has its own style, so you can tell them apart.</p>
                 </div>
                 <div class="card">
                     <div class="ic ic-b">🚧</div>
-                    <h3 data-i18n="why.c3h">Fresh, real data</h3>
-                    <p data-i18n="why.c3p">Road types, surfaces, and up-to-date closures — so your "shortcut" isn't a dead end or a highway.</p>
+                    <h3 data-i18n="why.c3h">Surfaces and closures</h3>
+                    <p data-i18n="why.c3p">The map shows road types, surfaces and current closures, so you can stay off busy roads and closed sections.</p>
                 </div>
                 <div class="card">
                     <div class="ic ic-b">🧭</div>
-                    <h3 data-i18n="why.c4h">Smarter planning</h3>
-                    <p data-i18n="why.c4p">Sticks to real routes, ⌘/Ctrl-click to drop points fast, and respects MTB vs road riding.</p>
+                    <h3 data-i18n="why.c4h">Route planner</h3>
+                    <p data-i18n="why.c4p">Routes follow real paths, road and mountain bikes get separate modes, and ⌘/Ctrl-click adds a point.</p>
                 </div>
             </div>
         </div>
@@ -302,13 +304,13 @@
     <section class="block soft" id="compare">
         <div class="wrap">
             <div class="kicker">Mapy.com vs Strava</div>
-            <h2 data-i18n="cmp.h2">Built for planning — see the difference</h2>
-            <p class="lead" data-i18n="cmp.lead">Same spot, two maps: <a class="mapy-link" href="https://mapy.com" target="_blank" rel="noopener">Mapy.com</a>
-                on the left, <a class="strava-link" href="https://www.strava.com/maps/global-heatmap" target="_blank" rel="noopener">Strava</a> on the right.</p>
+            <h2 data-i18n="cmp.h2">The same place on both maps</h2>
+            <p class="lead" data-i18n="cmp.lead">Drag the slider to compare. <a class="mapy-link" href="https://mapy.com" target="_blank" rel="noopener">Mapy.com</a>
+                is on the left, <a class="strava-link" href="https://www.strava.com/maps/global-heatmap" target="_blank" rel="noopener">Strava</a> on the right.</p>
             <div class="cmp-list">
                 <div class="cmp">
-                    <h3 data-i18n="cmp.r1h">⛰️ See the terrain — and the roads</h3>
-                    <p data-i18n="cmp.r1p">Gradient shading and contours tell you instantly whether it's hilly or flat, forest or open — and busy main roads, quiet lanes, and gravel or forest tracks are each coloured differently, so your A→B isn't a highway full of cars. Strava's base map stays flat and bare.</p>
+                    <h3 data-i18n="cmp.r1h">Terrain and road types</h3>
+                    <p data-i18n="cmp.r1p">Hill shading and contours show whether the ground is hilly or flat, forest or open. Main roads, quiet lanes and gravel or forest tracks each have their own colour, which makes it easy to keep a route off busy roads. On Strava's map the same area looks flat and most roads look alike.</p>
                     <div class="ba">
                         <img class="ba-img" src="img/cmp-terrain-strava.png?v=2" alt="Same area on Strava">
                         <img class="ba-img ba-top" src="img/cmp-terrain-mapy.png?v=2" alt="Same area on Mapy.com">
@@ -319,8 +321,8 @@
                     </div>
                 </div>
                 <div class="cmp">
-                    <h3 data-i18n="cmp.r2h">🛤️ Every path — and a smarter planner</h3>
-                    <p data-i18n="cmp.r2p">Every tiny trail in the middle of nowhere is on Mapy.com, with up-to-date closures — and when you plan, it snaps to real routes (⌘/Ctrl-click to drop points) and respects MTB vs road. Strava's map misses the small stuff, and its planner is clunkier.</p>
+                    <h3 data-i18n="cmp.r2h">Small trails and route planning</h3>
+                    <p data-i18n="cmp.r2p">Mapy.com has small trails even in remote areas, along with current closures. The planner keeps the route on real paths and has separate road and MTB modes. Strava's map leaves out many of these paths.</p>
                     <div class="ba">
                         <img class="ba-img" src="img/cmp-paths-strava.png?v=2" alt="Same area on Strava">
                         <img class="ba-img ba-top" src="img/cmp-paths-mapy.png?v=2" alt="Same area on Mapy.com">
@@ -346,7 +348,7 @@
             <a href="https://github.com/matejcermak/heatmapy/blob/main/PRIVACY.md" target="_blank" rel="noopener" data-i18n="foot.privacy">Privacy</a>
             <a href="#" data-cta="coffee" data-i18n="foot.donate">Donate</a>
         </div>
-        <p class="disclaim" data-i18n="foot.disclaim">An independent project — not affiliated with <a class="strava-link" href="https://www.strava.com/maps/global-heatmap" target="_blank" rel="noopener">Strava</a> or <a class="mapy-link" href="https://mapy.com" target="_blank" rel="noopener">Mapy.com</a>. Heatmap data © <a class="strava-link" href="https://www.strava.com/maps/global-heatmap" target="_blank" rel="noopener">Strava</a>; maps © <a class="mapy-link" href="https://mapy.com" target="_blank" rel="noopener">Mapy.com</a> / Seznam.cz.</p>
+        <p class="disclaim" data-i18n="foot.disclaim">An independent project, not affiliated with <a class="strava-link" href="https://www.strava.com/maps/global-heatmap" target="_blank" rel="noopener">Strava</a> or <a class="mapy-link" href="https://mapy.com" target="_blank" rel="noopener">Mapy.com</a>. Heatmap data © <a class="strava-link" href="https://www.strava.com/maps/global-heatmap" target="_blank" rel="noopener">Strava</a>; maps © <a class="mapy-link" href="https://mapy.com" target="_blank" rel="noopener">Mapy.com</a> / Seznam.cz.</p>
     </div>
 </footer>
 
@@ -358,13 +360,6 @@
     const FIREFOX_URL = "https://github.com/matejcermak/heatmapy#firefox";
     document.querySelectorAll('[data-cta="chrome"]').forEach((a) => { a.href = CHROME_URL; a.target = "_blank"; a.rel = "noopener"; });
     document.querySelectorAll('[data-cta="firefox"]').forEach((a) => { a.href = FIREFOX_URL; a.target = "_blank"; a.rel = "noopener"; });
-
-    // Show the add-on button to Firefox (and its forks — Zen, LibreWolf, Waterfox all
-    // keep "Gecko/… Firefox/…" in the UA), the Chrome one to everybody else. Both
-    // exist in the DOM, so no-JS visitors still see the Chrome button.
-    const IS_GECKO = /\bFirefox\/\d/.test(navigator.userAgent) && !/Seamonkey\//.test(navigator.userAgent);
-    document.querySelectorAll('[data-cta="chrome"]').forEach((a) => { a.hidden = IS_GECKO; });
-    document.querySelectorAll('[data-cta="firefox"]').forEach((a) => { a.hidden = !IS_GECKO; });
 
     // ===== Donations =====
     // Stripe Adaptive Pricing does NOT convert pay-what-you-want / custom-amount links — they
@@ -401,40 +396,36 @@
     // ===== i18n: English lives in the DOM; Czech overrides below. Auto-detect from the
     // browser, with a subtle EN/CS switcher that remembers the choice (localStorage). =====
     const CS = {
-        'meta.title': `Heatmapy — Strava heatmapy na Mapy.com`,
+        'meta.title': `Heatmapy – heatmapy ze Stravy na Mapy.com`,
         'nav.why': `Proč Mapy`,
-        'cta.chrome': `Rozšíření do Chromu (zdarma)`,
-        'cta.chromeShort': `Rozšíření (zdarma)`,
-        'cta.firefox': `Rozšíření do Firefoxu (zdarma)`,
-        'cta.firefoxShort': `Rozšíření (zdarma)`,
         'cta.coffee': `☕ Kup mi kafe`,
         'cta.github': `Zobrazit na GitHubu`,
-        'hero.h1': `Strava heatmapy na mapě, která <span class="g">se fakt hodí na plánování</span>.`,
-        'hero.sub': `Promítni <span class="hm">globální heatmapu</span> ze <a class="strava-link" href="https://www.strava.com/maps/global-heatmap" target="_blank" rel="noopener">Stravy</a> i svoji <span class="hmp">osobní heatmapu</span> na <a class="mapy-link" href="https://mapy.com" target="_blank" rel="noopener">Mapy.com</a> — přepínej mapy pro 🚴 silnici / 🚵 MTB / 🌄 gravel / 🏃 běh, naplánuj trasu a <b>pošli ji rovnou do Stravy</b> → do Garminu nebo Wahoo.`,
-        'hero.maintain': `<b>Aktivně vyvíjeno.</b> Pravidelně opravuji chyby a přidávám vylepšení — narazil jsi na chybu, nebo máš nápad? <a href="https://github.com/matejcermak/heatmapy/issues" target="_blank" rel="noopener">Založ issue na GitHubu →</a>`,
-        'hero.videocap': `<span class="hm">Globální MTB heatmapa</span> + tvoje <span class="hmp">osobní heatmapa</span>`,
-        'hero.subnote': `Zdarma. Globální heatmapa nad úrovní přiblížení 11, <span class="hmp">osobní heatmapa</span> a <b>synchronizace do Stravy</b> vyžadují předplatné <a class="strava-link" href="https://www.strava.com/maps/global-heatmap" target="_blank" rel="noopener">Stravy</a>.`,
+        'hero.h1': `Heatmapy ze Stravy na <span class="g">Mapy.com</span>`,
+        'hero.sub': `Zobraz si <span class="hm">globální heatmapu</span> ze <a class="strava-link" href="https://www.strava.com/maps/global-heatmap" target="_blank" rel="noopener">Stravy</a> i svou <span class="hmp">osobní heatmapu</span> na <a class="mapy-link" href="https://mapy.com" target="_blank" rel="noopener">Mapy.com</a>, zvlášť pro silnici, MTB, gravel, běh a trail. Naplánovanou trasu <b>pošleš do Stravy</b> a odtud se dostane do Garminu nebo Wahoo.`,
+        'hero.maintain': `<b>Rozšíření aktivně vyvíjím.</b> Když něco nefunguje nebo ti chybí nějaká funkce, <a href="https://github.com/matejcermak/heatmapy/issues" target="_blank" rel="noopener">dej mi vědět na GitHubu</a>.`,
+        'hero.videocap': `<span class="hm">Globální MTB heatmapa</span> a tvoje <span class="hmp">osobní heatmapa</span>`,
+        'hero.subnote': `Rozšíření je zdarma. Globální heatmapa při přiblížení nad úroveň 11, <span class="hmp">osobní heatmapa</span> a tlačítko <b>Sync to Strava</b> fungují jen s předplatným <a class="strava-link" href="https://www.strava.com/maps/global-heatmap" target="_blank" rel="noopener">Stravy</a>.`,
         'why.kicker': `Proč Mapy.com`,
-        'why.h2': `Mapa stvořená pro outdoor — a pro plánování`,
-        'why.lead': `Podkladová mapa <a class="strava-link" href="https://www.strava.com/maps/global-heatmap" target="_blank" rel="noopener">Stravy</a> je chudá. Outdoorová mapa <a class="mapy-link" href="https://mapy.com" target="_blank" rel="noopener">Mapy.com</a> ukáže to, na čem při výběru trasy opravdu záleží.`,
-        'why.c1h': `Uvidíš terén`,
-        'why.c1p': `Stínování a vrstevnice — na první pohled poznáš, jestli je to do kopce, lesem, nebo placka, ještě než vyrazíš.`,
-        'why.c2h': `Každá existující cesta`,
-        'why.c2p': `Od dálnic po nejmenší lesní singletrek uprostřed ničeho — a poznáš, co je co.`,
-        'why.c3h': `Aktuální, reálná data`,
-        'why.c3p': `Typy cest, povrchy a aktuální uzavírky — aby tvoje „zkratka“ nebyla slepá ulice nebo dálnice.`,
-        'why.c4h': `Chytřejší plánování`,
-        'why.c4p': `Drží se reálných cest, ⌘/Ctrl-klikem rychle přidáš body a rozlišuje MTB a silnici.`,
-        'cmp.h2': `Stvořeno pro plánování — uvidíš ten rozdíl`,
-        'cmp.lead': `Stejné místo, dvě mapy: <a class="mapy-link" href="https://mapy.com" target="_blank" rel="noopener">Mapy.com</a> vlevo, <a class="strava-link" href="https://www.strava.com/maps/global-heatmap" target="_blank" rel="noopener">Strava</a> vpravo.`,
-        'cmp.r1h': `⛰️ Uvidíš terén — i cesty`,
-        'cmp.r1p': `Stínování a vrstevnice ti hned řeknou, jestli je to do kopce nebo placka, les nebo otevřená krajina — a rušné hlavní silnice, klidné silničky i šotolinové či lesní cesty mají každá jinou barvu, takže tvoje trasa z A do B není dálnice plná aut. Podkladová mapa Stravy zůstává plochá a holá.`,
-        'cmp.r2h': `🛤️ Každá cesta — a chytřejší plánovač`,
-        'cmp.r2p': `Každá maličká pěšina uprostřed ničeho je na Mapy.com, včetně aktuálních uzavírek — a při plánování se trasa drží reálných cest (⌘/Ctrl-klikem přidáš body) a rozlišuje MTB a silnici. Mapa Stravy malé cesty vynechává a její plánovač je kostrbatější.`,
-        'foot.issues': `Issues a zpětná vazba`,
-        'foot.privacy': `Soukromí`,
+        'why.h2': `Terén, stezky i uzavírky na jedné mapě`,
+        'why.lead': `Mapa ve <a class="strava-link" href="https://www.strava.com/maps/global-heatmap" target="_blank" rel="noopener">Stravě</a> stačí na prohlížení aktivit, na plánování ale ukazuje málo. Turistická mapa na <a class="mapy-link" href="https://mapy.com" target="_blank" rel="noopener">Mapy.com</a> zobrazuje terén, malé cesty i povrchy.`,
+        'why.c1h': `Stínování a vrstevnice`,
+        'why.c1p': `Uvidíš, kde jsou kopce, lesy a otevřená krajina, ještě než vyrazíš.`,
+        'why.c2h': `I ty nejmenší cesty`,
+        'why.c2p': `Od dálnic po úzké lesní singltreky. Každý typ cesty má na mapě vlastní styl, takže je snadno rozlišíš.`,
+        'why.c3h': `Povrchy a uzavírky`,
+        'why.c3p': `Mapa ukazuje typy cest, povrchy a aktuální uzavírky, takže se vyhneš rušným silnicím i uzavřeným úsekům.`,
+        'why.c4h': `Plánovač tras`,
+        'why.c4p': `Trasa vede po skutečných cestách, silniční kolo a MTB mají vlastní režim a bod přidáš ⌘/Ctrl+klikem.`,
+        'cmp.h2': `Stejné místo na obou mapách`,
+        'cmp.lead': `Obě mapy porovnáš posuvníkem: vlevo <a class="mapy-link" href="https://mapy.com" target="_blank" rel="noopener">Mapy.com</a>, vpravo <a class="strava-link" href="https://www.strava.com/maps/global-heatmap" target="_blank" rel="noopener">Strava</a>.`,
+        'cmp.r1h': `Terén a typy cest`,
+        'cmp.r1p': `Stínování a vrstevnice ukážou, kde je kopec a kde rovina, kde les a kde otevřená krajina. Hlavní silnice, klidné silničky, šotolinové i lesní cesty mají každá svou barvu, takže se snadno vyhneš provozu. Na mapě Stravy působí stejné místo ploše a cesty se od sebe skoro neliší.`,
+        'cmp.r2h': `Malé cesty a plánování tras`,
+        'cmp.r2p': `Na Mapy.com najdeš i malé stezky v odlehlých místech a k tomu aktuální uzavírky. Plánovač drží trasu na skutečných cestách a rozlišuje silniční kolo a MTB. Mapa Stravy spoustu takových cest vůbec nemá.`,
+        'foot.issues': `Chyby a nápady`,
+        'foot.privacy': `Ochrana soukromí`,
         'foot.donate': `Přispět`,
-        'foot.disclaim': `Nezávislý projekt — bez napojení na <a class="strava-link" href="https://www.strava.com/maps/global-heatmap" target="_blank" rel="noopener">Stravu</a> nebo <a class="mapy-link" href="https://mapy.com" target="_blank" rel="noopener">Mapy.com</a>. Data heatmap © <a class="strava-link" href="https://www.strava.com/maps/global-heatmap" target="_blank" rel="noopener">Strava</a>; mapy © <a class="mapy-link" href="https://mapy.com" target="_blank" rel="noopener">Mapy.com</a> / Seznam.cz.`,
+        'foot.disclaim': `Nezávislý projekt bez vazby na <a class="strava-link" href="https://www.strava.com/maps/global-heatmap" target="_blank" rel="noopener">Stravu</a> nebo <a class="mapy-link" href="https://mapy.com" target="_blank" rel="noopener">Mapy.com</a>. Data heatmap © <a class="strava-link" href="https://www.strava.com/maps/global-heatmap" target="_blank" rel="noopener">Strava</a>, mapy © <a class="mapy-link" href="https://mapy.com" target="_blank" rel="noopener">Mapy.com</a> / Seznam.cz.`,
     };
     const enTitle = document.title;
     const i18nCache = {};
