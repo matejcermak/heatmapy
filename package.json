@@ -1,6 +1,6 @@
 {
   "name": "heatmapy",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "description": "Overlay your Strava global and personal heatmaps on Mapy.com, and send planned routes to Strava.",
   "private": true,
   "type": "module",
