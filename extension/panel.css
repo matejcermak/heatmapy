@@ -149,6 +149,67 @@
     color: #8a8a92; /* dim grey when everything is muted */
 }
 
+/* minimize (chevron) at the right end of the title row — issue #9 */
+#msh-panel .msh-min-btn {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: #b8b8c0;
+    cursor: pointer;
+}
+
+#msh-panel .msh-min-btn:hover {
+    background: rgba(255, 255, 255, 0.12);
+    color: #fff;
+}
+
+#msh-panel .msh-min-btn svg {
+    width: 16px;
+    height: 16px;
+    display: block;
+    transition: transform 0.15s;
+}
+
+/* minimized: only the title row (logo, spinner, master toggle, chevron),
+   shrink-wrapped so it covers as little map as possible */
+#msh-panel.msh-panel--min {
+    width: auto;
+    padding: 6px 8px 6px 10px;
+}
+
+#msh-panel.msh-panel--min > :not(.msh-title) {
+    display: none;
+}
+
+#msh-panel.msh-panel--min .msh-title {
+    margin-bottom: 0;
+}
+
+#msh-panel.msh-panel--min .msh-min-btn svg {
+    transform: rotate(180deg);
+}
+
+/* keep the spinner's slot reserved so the buttons don't jump while tiles load */
+#msh-panel.msh-panel--min .msh-load {
+    display: inline-flex;
+    visibility: hidden;
+}
+
+#msh-panel.msh-panel--min .msh-load.is-loading {
+    visibility: visible;
+}
+
+#msh-panel.msh-panel--min .msh-loadlabel {
+    display: none;
+}
+
 /* keycap-style shortcut hints (A / S / D / F) — square, like a real key */
 #msh-panel .msh-key {
     display: inline-flex;

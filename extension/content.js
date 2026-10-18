@@ -46,6 +46,7 @@
     let globalOn = true; // G: global heatmap layer on/off (independent)
     let personalOn = false; // F: personal heatmap layer on/off (independent)
     let opacity = 100;
+    let panelMin = false; // panel collapsed to just its title row
     let athleteId = "";
 
     let overlayRoot = null;
@@ -115,6 +116,7 @@
     globalOn = lsGet("globalOn", "1") !== "0"; // default on (matches old always-on behavior)
     personalOn = lsGet("personalOn", "") === "1";
     opacity = clamp(parseInt(lsGet("opacity", "100"), 10) || 100, 0, 100);
+    panelMin = lsGet("panelMin", "") === "1";
 
     // ---- Athlete id (for the personal heatmap) -------------------------------
     function applyAthleteId(id) {
@@ -1065,6 +1067,9 @@
             "Heatmapy" +
             '<span class="msh-load" aria-hidden="true"><span class="msh-spin"></span><span class="msh-loadlabel">loading…</span></span>' +
             '<button class="msh-master-btn" data-act="master" title="Toggle all heatmaps (A)" aria-label="Toggle all heatmaps"><kbd class="msh-key">A</kbd><span class="msh-power">⏻</span></button>' +
+            '<button class="msh-min-btn" data-act="min">' +
+            '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>' +
+            "</button>" +
             "</div>",
             '<div class="msh-row msh-sport" role="group" aria-label="Sport">',
             '<kbd class="msh-key">S</kbd>',
@@ -1103,6 +1108,7 @@
         document.body.appendChild(panelRoot);
 
         panelRoot.querySelector('[data-act="master"]').addEventListener("click", masterToggle);
+        panelRoot.querySelector('[data-act="min"]').addEventListener("click", togglePanelMin);
         panelRoot.querySelector('[data-act="global"]').addEventListener("click", toggleGlobal);
         panelRoot.querySelector('[data-act="personal"]').addEventListener("click", togglePersonal);
         panelRoot.querySelector('[data-act="export"]').addEventListener("click", exportRoute);
@@ -1121,9 +1127,17 @@
             return;
         }
         const master = panelRoot.querySelector('[data-act="master"]');
+        const min = panelRoot.querySelector('[data-act="min"]');
         const g = panelRoot.querySelector('[data-act="global"]');
         const p = panelRoot.querySelector('[data-act="personal"]');
         const hint = panelRoot.querySelector(".msh-hint");
+        panelRoot.classList.toggle("msh-panel--min", panelMin);
+        if (min) {
+            const label = panelMin ? "Expand panel" : "Minimize panel";
+            min.title = label;
+            min.setAttribute("aria-label", label);
+            min.setAttribute("aria-expanded", panelMin ? "false" : "true");
+        }
         if (master) {
             master.classList.toggle("msh-master--off", masterOff);
         }
@@ -1198,6 +1212,13 @@
         lsSet("masterOff", masterOff ? "1" : "0");
         renderPanel();
         requestRender();
+    }
+    // Collapse the panel to its title row (logo + master toggle) so it stays out
+    // of the way while browsing; the layers keep rendering — issue #9.
+    function togglePanelMin() {
+        panelMin = !panelMin;
+        lsSet("panelMin", panelMin ? "1" : "0");
+        renderPanel();
     }
     function setOpacity(v) {
         opacity = clamp(v || 0, 0, 100);
