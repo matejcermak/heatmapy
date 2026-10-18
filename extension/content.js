@@ -49,12 +49,8 @@
     let athleteId = "";
 
     let overlayRoot = null;
-    let globalLayer = null;
-    let personalLayer = null;
     let panelRoot = null;
     let rafId = null;
-    let renderSeq = 0;
-    let lastStateKey = "";
     let pendingTiles = 0; // tiles currently fetching from the network (not cache)
     let loadingHideTimer = null;
 
@@ -125,7 +121,6 @@
         const next = String(id || "");
         if (next !== athleteId) {
             athleteId = next;
-            lastStateKey = "";
             requestRender();
             renderPanel();
         }
@@ -244,7 +239,10 @@
     }
 
     // ---- Caches --------------------------------------------------------------
-    const memCache = new Map(); // url -> objectURL
+    // A tile with no heat in it is cached as EMPTY_TILE so it's neither drawn
+    // nor fetched again.
+    const EMPTY_TILE = "empty";
+    const memCache = new Map(); // url -> objectURL | EMPTY_TILE
     function memGet(url) {
         const v = memCache.get(url);
         if (v) {
@@ -262,6 +260,9 @@
             const k = memCache.keys().next().value;
             const u = memCache.get(k);
             memCache.delete(k);
+            if (u === EMPTY_TILE) {
+                continue;
+            }
             try {
                 URL.revokeObjectURL(u);
             } catch (_) {
@@ -272,6 +273,10 @@
 
     const DB_NAME = "mapyStravaTileCache";
     const DB_STORE = "tiles";
+    // Bumped when what we store changes. v2: tiles pass through cleanGlobalTile
+    // first; v1 entries may hold the opaque-black tiles from issue #9, so they
+    // count as misses and get re-fetched (and overwritten).
+    const TILE_CACHE_VERSION = 2;
     let dbPromise = null;
     function openDb() {
         if (dbPromise) {
@@ -312,6 +317,7 @@
             return null;
         }
     }
+    // blob = null stores "this tile is empty".
     function idbPut(url, blob) {
         (async () => {
             try {
@@ -320,7 +326,10 @@
                     return;
                 }
                 const tx = db.transaction(DB_STORE, "readwrite");
-                tx.objectStore(DB_STORE).put({ blob, ts: Date.now() }, url);
+                tx.objectStore(DB_STORE).put(
+                    { blob, empty: !blob, ts: Date.now(), v: TILE_CACHE_VERSION },
+                    url
+                );
             } catch (_) {
                 // best-effort
             }
@@ -390,7 +399,7 @@
     // tiles so the banner clears on its own, no manual reload needed.
     function retryAfterLogin() {
         if (loginBanner && !document.hidden) {
-            lastStateKey = "";
+            resetTiles();
             requestRender();
         }
     }
@@ -439,131 +448,464 @@
         return { ok: false, status: resp.status || 0 };
     }
 
-    // Personal tiles arrive opaque-black with grayscale heat; key black ->
-    // transparent and paint the heat blue (alpha = boosted intensity).
-    function recolorToBlue(blob) {
-        return new Promise((resolve) => {
-            let srcUrl = "";
-            const done = (out) => {
-                if (srcUrl) {
-                    try {
-                        URL.revokeObjectURL(srcUrl);
-                    } catch (_) {
-                        // ignore
-                    }
-                }
-                resolve(out);
-            };
-            try {
-                srcUrl = URL.createObjectURL(blob);
-                const im = new Image();
-                im.onload = () => {
-                    try {
-                        const w = im.naturalWidth || 256;
-                        const h = im.naturalHeight || 256;
-                        const canvas = document.createElement("canvas");
-                        canvas.width = w;
-                        canvas.height = h;
-                        const ctx = canvas.getContext("2d");
-                        ctx.drawImage(im, 0, 0, w, h);
-                        const data = ctx.getImageData(0, 0, w, h);
-                        const d = data.data;
-                        for (let i = 0; i < d.length; i += 4) {
-                            const intensity = Math.max(d[i], d[i + 1], d[i + 2]);
-                            d[i] = PERSONAL_RGB[0];
-                            d[i + 1] = PERSONAL_RGB[1];
-                            d[i + 2] = PERSONAL_RGB[2];
-                            d[i + 3] =
-                                intensity <= PERSONAL_ALPHA_THRESHOLD
-                                    ? 0
-                                    : Math.min(
-                                          255,
-                                          Math.round(intensity * PERSONAL_ALPHA_GAIN) + PERSONAL_ALPHA_FLOOR
-                                      );
-                        }
-                        ctx.putImageData(data, 0, 0);
-                        canvas.toBlob((out) => done(out ? URL.createObjectURL(out) : ""), "image/png");
-                    } catch (_) {
-                        done("");
-                    }
-                };
-                im.onerror = () => done("");
-                im.src = srcUrl;
-            } catch (_) {
-                done("");
-            }
-        });
+    // ---- Tile pixels ---------------------------------------------------------
+    // createImageBitmap(blob) is always origin-clean, so reading the pixels back
+    // can't throw the way drawing an <img> from a blob: URL can.
+    async function tilePixels(blob) {
+        const bmp = await createImageBitmap(blob);
+        const w = bmp.width || 256;
+        const h = bmp.height || 256;
+        let canvas;
+        if (typeof OffscreenCanvas === "function") {
+            canvas = new OffscreenCanvas(w, h);
+        } else {
+            canvas = document.createElement("canvas");
+            canvas.width = w;
+            canvas.height = h;
+        }
+        const ctx = canvas.getContext("2d", { willReadFrequently: true });
+        ctx.drawImage(bmp, 0, 0);
+        if (bmp.close) {
+            bmp.close();
+        }
+        return { canvas, ctx, data: ctx.getImageData(0, 0, w, h) };
+    }
+    function canvasToBlob(canvas) {
+        if (canvas.convertToBlob) {
+            return canvas.convertToBlob({ type: "image/png" });
+        }
+        return new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
     }
 
-    function loadTile(img, layer, z, x, y, seq) {
-        const url =
-            layer.kind === "personal"
-                ? buildPersonalUrl(layer.sport, z, x, y)
-                : buildGlobalUrl(layer.sport, z, x, y);
+    // Personal tiles arrive opaque-black with grayscale heat; key black ->
+    // transparent and paint the heat blue (alpha = boosted intensity).
+    // Resolves to an objectURL, EMPTY_TILE, or "" on failure — never to the raw
+    // tile, whose opaque black would cover the map.
+    async function recolorToBlue(blob) {
+        try {
+            const { canvas, ctx, data } = await tilePixels(blob);
+            const d = data.data;
+            let any = false;
+            for (let i = 0; i < d.length; i += 4) {
+                const intensity = Math.max(d[i], d[i + 1], d[i + 2]);
+                d[i] = PERSONAL_RGB[0];
+                d[i + 1] = PERSONAL_RGB[1];
+                d[i + 2] = PERSONAL_RGB[2];
+                if (intensity <= PERSONAL_ALPHA_THRESHOLD) {
+                    d[i + 3] = 0;
+                } else {
+                    d[i + 3] = Math.min(
+                        255,
+                        Math.round(intensity * PERSONAL_ALPHA_GAIN) + PERSONAL_ALPHA_FLOOR
+                    );
+                    any = true;
+                }
+            }
+            if (!any) {
+                return EMPTY_TILE;
+            }
+            ctx.putImageData(data, 0, 0);
+            const out = await canvasToBlob(canvas);
+            return out ? URL.createObjectURL(out) : "";
+        } catch (_) {
+            return "";
+        }
+    }
+
+    // Global "hot" tiles have a transparent background, but some come back
+    // opaque black instead — whole black squares over the map (issue #9,
+    // reported with Trail Run). The hot palette has no black in it, so key
+    // opaque near-black to transparent. Resolves to { blob }, or { empty: true }
+    // when nothing visible is left.
+    const OPAQUE_BLACK_MAX = 8;
+    function isOpaqueBlack(d, i) {
+        return d[i + 3] >= 250 &&
+            d[i] <= OPAQUE_BLACK_MAX && d[i + 1] <= OPAQUE_BLACK_MAX && d[i + 2] <= OPAQUE_BLACK_MAX;
+    }
+    async function cleanGlobalTile(blob) {
+        let px;
+        try {
+            px = await tilePixels(blob);
+        } catch (_) {
+            return { blob }; // can't inspect it — draw it as is, like before
+        }
+        const d = px.data.data;
+        let black = 0;
+        let heat = 0;
+        for (let i = 0; i < d.length; i += 4) {
+            if (d[i + 3] === 0) {
+                continue;
+            }
+            if (isOpaqueBlack(d, i)) {
+                black += 1;
+            } else {
+                heat += 1;
+            }
+        }
+        if (heat === 0) {
+            return { empty: true };
+        }
+        if (black === 0) {
+            return { blob }; // the normal case: keep Strava's bytes as they are
+        }
+        for (let i = 0; i < d.length; i += 4) {
+            if (isOpaqueBlack(d, i)) {
+                d[i + 3] = 0;
+            }
+        }
+        px.ctx.putImageData(px.data, 0, 0);
+        const out = await canvasToBlob(px.canvas);
+        return out ? { blob: out } : { empty: true };
+    }
+
+    // ---- Tile loading --------------------------------------------------------
+    // One job per URL, however many tiles are waiting on it. Jobs run a few at a
+    // time, newest first — so after a fast pan the tiles now on screen load
+    // before the ones you flew past, and a job whose tiles have all scrolled away
+    // before its turn is dropped without a request.
+    const MAX_TILE_JOBS = 8;
+    const jobQueue = [];
+    const jobsByUrl = new Map(); // url -> job (queued or running)
+    let jobsRunning = 0;
+
+    function tileUrl(kind, sport, z, x, y) {
+        return kind === "personal" ? buildPersonalUrl(sport, z, x, y) : buildGlobalUrl(sport, z, x, y);
+    }
+    function jobWanted(job) {
+        return job.tiles.some((t) => !t.dead);
+    }
+    function requestTile(layer, z, tile) {
+        const url = tileUrl(layer.kind, layer.sport, z, tile.x, tile.y);
         if (!url) {
+            tile.done = true;
             return;
         }
         const mem = memGet(url);
         if (mem) {
-            img.src = mem;
+            showTile(tile, mem);
             return;
         }
-        const persist = layer.kind === "global";
-        (async () => {
-            if (persist) {
-                const hit = await idbGet(url);
-                if (seq !== renderSeq) {
-                    return;
-                }
-                if (hit && hit.blob && Date.now() - (hit.ts || 0) < GLOBAL_TILE_TTL_MS) {
-                    const u = URL.createObjectURL(hit.blob);
-                    memPut(url, u);
-                    img.src = u;
-                    return;
-                }
+        let job = jobsByUrl.get(url);
+        if (!job) {
+            job = { url, kind: layer.kind, z, tiles: [] };
+            jobsByUrl.set(url, job);
+            jobQueue.push(job);
+        }
+        job.tiles.push(tile);
+        pumpJobs();
+    }
+    function pumpJobs() {
+        while (jobsRunning < MAX_TILE_JOBS && jobQueue.length) {
+            const job = jobQueue.pop();
+            if (!jobWanted(job)) {
+                jobsByUrl.delete(job.url);
+                continue;
             }
-            if (seq !== renderSeq) {
-                return;
+            jobsRunning += 1;
+            runJob(job).finally(() => {
+                jobsRunning -= 1;
+                pumpJobs();
+            });
+        }
+    }
+    async function runJob(job) {
+        let value = "";
+        try {
+            value = (await loadTileData(job)) || "";
+        } catch (_) {
+            value = "";
+        }
+        jobsByUrl.delete(job.url);
+        if (value) {
+            memPut(job.url, value);
+        }
+        for (const t of job.tiles) {
+            showTile(t, value);
+        }
+    }
+    // Resolves to an objectURL, EMPTY_TILE, or "" (failed — nothing to draw).
+    async function loadTileData(job) {
+        const { url, kind, z } = job;
+        if (kind === "global") {
+            const hit = await idbGet(url);
+            if (
+                hit && hit.v === TILE_CACHE_VERSION &&
+                Date.now() - (hit.ts || 0) < GLOBAL_TILE_TTL_MS &&
+                (hit.empty || hit.blob)
+            ) {
+                return hit.empty ? EMPTY_TILE : URL.createObjectURL(hit.blob);
             }
-            // From here it's a real network fetch -> reflect it in the spinner.
-            pendingTiles += 1;
+        }
+        if (!jobWanted(job)) {
+            return ""; // scrolled away while we checked the cache
+        }
+        // From here it's a real network fetch -> reflect it in the spinner.
+        pendingTiles += 1;
+        updateLoading();
+        try {
+            const res = await fetchTileViaSW(url);
+            if (!res.ok || !res.blob) {
+                if (res.status === 401 || res.status === 403) {
+                    noteAuthFailure(kind, z);
+                }
+                return "";
+            }
+            // A tile came back over the network -> the Strava session works
+            // (logged out, every tile 403s), so the login nag is done.
+            clearLoginBanner();
+            if (kind === "personal") {
+                return await recolorToBlue(res.blob);
+            }
+            const clean = await cleanGlobalTile(res.blob);
+            idbPut(url, clean.empty ? null : clean.blob);
+            return clean.empty ? EMPTY_TILE : URL.createObjectURL(clean.blob);
+        } finally {
+            pendingTiles -= 1;
             updateLoading();
-            try {
-                const res = await fetchTileViaSW(url);
-                if (seq !== renderSeq) {
-                    return; // a newer render superseded this tile
-                }
-                if (!res.ok || !res.blob) {
-                    if (res.status === 401 || res.status === 403) {
-                        noteAuthFailure(layer.kind, z);
-                    }
-                    return;
-                }
-                // A tile came back over the network -> the Strava session works
-                // (logged out, every tile 403s), so the login nag is done.
-                clearLoginBanner();
-                if (layer.kind === "personal") {
-                    const recolored = await recolorToBlue(res.blob);
-                    if (seq !== renderSeq) {
-                        return;
-                    }
-                    const u = recolored || URL.createObjectURL(res.blob);
-                    memPut(url, u);
-                    img.src = u;
-                } else {
-                    const u = URL.createObjectURL(res.blob);
-                    memPut(url, u);
-                    idbPut(url, res.blob);
-                    img.src = u;
-                }
-            } finally {
-                pendingTiles -= 1;
-                updateLoading();
-            }
-        })();
+        }
+    }
+    function showTile(tile, value) {
+        if (tile.dead) {
+            return;
+        }
+        if (value && value !== EMPTY_TILE) {
+            tile.img.src = value; // done once it decodes (see addTile)
+        } else {
+            tile.done = true;
+        }
     }
 
-    // ---- Overlay elements ----------------------------------------------------
+    // ---- Overlay: tile layers that follow the camera ---------------------------
+    // Each layer (global, personal) keeps one <div> per tile zoom level, holding
+    // 256px <img> tiles laid out in that level's own pixel grid. Following the
+    // map is then just one CSS transform per level per frame: tiles are created
+    // once and reused while you pan, zoom or rotate, rather than rebuilt on every
+    // move. The previous level stays underneath until the new one has loaded,
+    // so crossing a zoom level doesn't blank the heat.
+    const TILE = 256;
+    const TILE_MARGIN = 1; // extra ring of tiles around the view: prefetch, less churn
+    const MAX_TILES_PER_LEVEL = 600; // sanity cap on a degenerate view
+    const MAX_TILT_DEG = 1; // a tilted (perspective) map can't be matched by a flat overlay
+    const tileLayers = { global: null, personal: null };
+
+    function createTileLayer(kind) {
+        const el = document.createElement("div");
+        Object.assign(el.style, { position: "absolute", inset: "0", overflow: "hidden" });
+        return { kind, el, sport: "", athlete: "", levels: new Map() }; // z -> level
+    }
+
+    function createLevel(layer, z, ox, oy) {
+        const el = document.createElement("div");
+        Object.assign(el.style, {
+            position: "absolute",
+            left: "0px",
+            top: "0px",
+            width: "0px",
+            height: "0px",
+            transformOrigin: "0 0",
+            willChange: "transform",
+        });
+        el.dataset.z = String(z);
+        layer.el.appendChild(el); // newest level on top
+        // Tiles sit at (x - ox, y - oy) * 256, i.e. relative to a tile near where
+        // the level was created — absolute pixel offsets at z15 run into the
+        // millions, which is beyond what CSS transforms place precisely.
+        const level = { z, ox, oy, el, tiles: new Map(), transform: "" };
+        layer.levels.set(z, level);
+        return level;
+    }
+
+    function removeLevel(layer, level) {
+        for (const t of level.tiles.values()) {
+            t.dead = true;
+        }
+        level.tiles.clear();
+        level.el.remove();
+        layer.levels.delete(level.z);
+    }
+
+    function resetTileLayer(layer) {
+        for (const level of Array.from(layer.levels.values())) {
+            removeLevel(layer, level);
+        }
+    }
+
+    // Drop every tile so they're requested again (e.g. after logging in).
+    function resetTiles() {
+        for (const layer of Object.values(tileLayers)) {
+            if (layer) {
+                resetTileLayer(layer);
+            }
+        }
+    }
+
+    function addTile(layer, level, x, y) {
+        const img = document.createElement("img");
+        img.alt = "";
+        img.draggable = false;
+        img.decoding = "async";
+        Object.assign(img.style, {
+            position: "absolute",
+            left: `${(x - level.ox) * TILE}px`,
+            top: `${(y - level.oy) * TILE}px`,
+            width: `${TILE}px`,
+            height: `${TILE}px`,
+            userSelect: "none",
+            visibility: "hidden", // until it has decoded
+        });
+        const tile = { img, x, y, done: false, dead: false };
+        img.onload = () => {
+            img.style.visibility = "";
+            tile.done = true;
+        };
+        img.onerror = () => {
+            tile.done = true;
+        };
+        level.tiles.set(`${x}/${y}`, tile);
+        level.el.appendChild(img);
+        requestTile(layer, level.z, tile);
+    }
+
+    // World pixel position of the view centre at tile zoom z.
+    function centerWorldPx(view, z) {
+        return { x: lonToTileX(view.lon, z) * TILE, y: latToTileY(view.lat, z) * TILE };
+    }
+
+    // Lay a level out under the camera: rotate + scale about the view centre.
+    function placeLevel(level, view) {
+        const s = Math.pow(2, view.zoom - level.z);
+        const c = centerWorldPx(view, level.z);
+        const ux = c.x - level.ox * TILE;
+        const uy = c.y - level.oy * TILE;
+        const a = Math.cos(view.rot) * s;
+        const b = Math.sin(view.rot) * s;
+        const e = view.cx - view.left - (a * ux - b * uy);
+        const f = view.cy - view.top - (b * ux + a * uy);
+        const t = `matrix(${a}, ${b}, ${-b}, ${a}, ${e}, ${f})`;
+        if (t !== level.transform) {
+            level.transform = t;
+            level.el.style.transform = t;
+        }
+    }
+
+    // Tile index range covering the view at zoom z (rotation-aware), widened by
+    // `margin` tiles on each side.
+    function tileRange(view, z, margin) {
+        const s = Math.pow(2, view.zoom - z);
+        const c = centerWorldPx(view, z);
+        const cos = Math.cos(view.rot);
+        const sin = Math.sin(view.rot);
+        const ox = view.cx - view.left;
+        const oy = view.cy - view.top;
+        let minX = Infinity;
+        let minY = Infinity;
+        let maxX = -Infinity;
+        let maxY = -Infinity;
+        for (const [px, py] of [[0, 0], [view.width, 0], [0, view.height], [view.width, view.height]]) {
+            // screen -> world: undo the rotation, then the scale
+            const dx = px - ox;
+            const dy = py - oy;
+            const wx = c.x + (cos * dx + sin * dy) / s;
+            const wy = c.y + (-sin * dx + cos * dy) / s;
+            minX = Math.min(minX, wx);
+            maxX = Math.max(maxX, wx);
+            minY = Math.min(minY, wy);
+            maxY = Math.max(maxY, wy);
+        }
+        const maxTile = Math.pow(2, z) - 1;
+        return {
+            x0: Math.floor(minX / TILE) - margin,
+            x1: Math.floor(maxX / TILE) + margin,
+            y0: Math.max(0, Math.floor(minY / TILE) - margin),
+            y1: Math.min(maxTile, Math.floor(maxY / TILE) + margin),
+        };
+    }
+    function inRange(r, x, y) {
+        return x >= r.x0 && x <= r.x1 && y >= r.y0 && y <= r.y1;
+    }
+
+    function updateTileLayer(layer, view) {
+        if (layer.sport !== globalSport || layer.athlete !== athleteId) {
+            resetTileLayer(layer); // different tiles altogether
+            layer.sport = globalSport;
+            layer.athlete = athleteId;
+        }
+        const z = clamp(Math.floor(view.zoom + 1e-6), MIN_ZOOM, GLOBAL_MAX_ZOOM);
+        const c = centerWorldPx(view, z);
+        let target = layer.levels.get(z);
+        // Re-anchor a level we've panned very far across (keeps offsets small).
+        if (target && Math.max(Math.abs(c.x / TILE - target.ox), Math.abs(c.y / TILE - target.oy)) > 4096) {
+            removeLevel(layer, target);
+            target = null;
+        }
+        if (!target) {
+            target = createLevel(layer, z, Math.floor(c.x / TILE), Math.floor(c.y / TILE));
+        } else if (layer.el.lastChild !== target.el) {
+            layer.el.appendChild(target.el); // back on top
+        }
+
+        // Target level: keep exactly the tiles in view (+ margin), add missing ones
+        // centre-last so they're fetched first (jobs run newest first).
+        const keep = tileRange(view, z, TILE_MARGIN);
+        for (const [key, t] of target.tiles) {
+            if (!inRange(keep, t.x, t.y)) {
+                t.dead = true;
+                t.img.remove();
+                target.tiles.delete(key);
+            }
+        }
+        if ((keep.x1 - keep.x0 + 1) * (keep.y1 - keep.y0 + 1) <= MAX_TILES_PER_LEVEL) {
+            const cx = c.x / TILE;
+            const cy = c.y / TILE;
+            const missing = [];
+            for (let y = keep.y0; y <= keep.y1; y += 1) {
+                for (let x = keep.x0; x <= keep.x1; x += 1) {
+                    if (!target.tiles.has(`${x}/${y}`)) {
+                        missing.push([x, y, (x + 0.5 - cx) ** 2 + (y + 0.5 - cy) ** 2]);
+                    }
+                }
+            }
+            missing.sort((p, q) => q[2] - p[2]);
+            for (const [x, y] of missing) {
+                addTile(layer, target, x, y);
+            }
+        }
+
+        // Older levels are only a stand-in while the target loads: drop their
+        // off-screen tiles, and drop them entirely once the target covers the view.
+        const visible = tileRange(view, z, 0);
+        let ready = true;
+        for (const t of target.tiles.values()) {
+            if (!t.done && inRange(visible, t.x, t.y)) {
+                ready = false;
+                break;
+            }
+        }
+        for (const level of Array.from(layer.levels.values())) {
+            if (level === target) {
+                continue;
+            }
+            if (ready || Math.abs(level.z - z) > 2) {
+                removeLevel(layer, level);
+                continue;
+            }
+            const r = tileRange(view, level.z, 0);
+            for (const [key, t] of level.tiles) {
+                if (!inRange(r, t.x, t.y)) {
+                    t.dead = true;
+                    t.img.remove();
+                    level.tiles.delete(key);
+                }
+            }
+            if (!level.tiles.size) {
+                removeLevel(layer, level);
+            }
+        }
+        for (const level of layer.levels.values()) {
+            placeLevel(level, view);
+        }
+    }
+
     function ensureElements() {
         if (!overlayRoot) {
             overlayRoot = document.createElement("div");
@@ -584,32 +926,15 @@
             });
             document.body.appendChild(overlayRoot);
         }
-        const rect = getMapViewportRect();
-        overlayRoot.style.left = `${rect.left}px`;
-        overlayRoot.style.top = `${rect.top}px`;
-        overlayRoot.style.width = `${rect.width}px`;
-        overlayRoot.style.height = `${rect.height}px`;
-
-        if (!globalLayer) {
-            globalLayer = document.createElement("div");
-            Object.assign(globalLayer.style, { position: "absolute", inset: "0", overflow: "hidden" });
-            overlayRoot.appendChild(globalLayer);
+        if (!tileLayers.global) {
+            tileLayers.global = createTileLayer("global");
+            overlayRoot.appendChild(tileLayers.global.el);
         }
-        if (!personalLayer) {
-            personalLayer = document.createElement("div");
-            Object.assign(personalLayer.style, { position: "absolute", inset: "0", overflow: "hidden" });
-            overlayRoot.appendChild(personalLayer); // on top of global
+        if (!tileLayers.personal) {
+            tileLayers.personal = createTileLayer("personal");
+            overlayRoot.appendChild(tileLayers.personal.el); // on top of global
         }
         ensurePanel();
-    }
-
-    function clearLayers() {
-        if (globalLayer) {
-            globalLayer.replaceChildren();
-        }
-        if (personalLayer) {
-            personalLayer.replaceChildren();
-        }
     }
 
     function getActiveLayers() {
@@ -626,93 +951,91 @@
         return layers;
     }
 
-    function drawTiles(state) {
-        renderSeq += 1;
-        const seq = renderSeq;
-        const rect = getMapViewportRect();
-        const width = rect.width;
-        const height = rect.height;
-        const zoomFloat = clamp(state.zoom, MIN_ZOOM, MAX_ZOOM);
-        const tileZoom = Math.min(Math.floor(zoomFloat), GLOBAL_MAX_ZOOM);
-        const scale = Math.pow(2, zoomFloat - tileZoom);
-        const centerPxX = lonToTileX(state.lon, tileZoom) * 256;
-        const centerPxY = latToTileY(state.lat, tileZoom) * 256;
-        const topLeftPxX = centerPxX - width / (2 * scale);
-        const topLeftPxY = centerPxY - height / (2 * scale);
-        const startX = Math.floor(topLeftPxX / 256) - 1;
-        const startY = Math.floor(topLeftPxY / 256) - 1;
-        const endX = Math.floor((topLeftPxX + width / scale) / 256) + 1;
-        const endY = Math.floor((topLeftPxY + height / scale) / 256) + 1;
-        const maxTileY = Math.pow(2, tileZoom) - 1;
+    // ---- Camera --------------------------------------------------------------
+    // Primary source: the live camera mapy-hook.js reads from Mapy's map engine
+    // every frame, so the heat moves with the map during a drag, a zoom
+    // animation, inertia or rotation. Fallback (engine not found, or the feed
+    // went quiet): the x/y/z Mapy writes into the URL once a move has finished.
+    const LIVE_CAMERA_STALE_MS = 2500; // the hook re-sends at least every 1 s
+    let liveCamera = null;
+    let liveCameraAt = 0;
+    document.addEventListener("msh-camera", (event) => {
+        let cam = null;
+        try {
+            cam = JSON.parse(event.detail);
+        } catch (_) {
+            return;
+        }
+        if (!cam || !Number.isFinite(cam.zoom) || !Number.isFinite(cam.lon) || !Number.isFinite(cam.lat)) {
+            return;
+        }
+        liveCamera = cam;
+        liveCameraAt = Date.now();
+        render(); // synchronously, in the frame the hook read the camera
+    });
 
-        clearLayers();
-        const layers = getActiveLayers();
-        for (const layer of layers) {
-            const div = layer.kind === "personal" ? personalLayer : globalLayer;
-            for (let ty = startY; ty <= endY; ty += 1) {
-                if (ty < 0 || ty > maxTileY) {
-                    continue;
-                }
-                for (let tx = startX; tx <= endX; tx += 1) {
-                    const img = document.createElement("img");
-                    img.alt = "";
-                    img.draggable = false;
-                    Object.assign(img.style, {
-                        position: "absolute",
-                        left: `${(tx * 256 - topLeftPxX) * scale}px`,
-                        top: `${(ty * 256 - topLeftPxY) * scale}px`,
-                        width: `${256 * scale}px`,
-                        height: `${256 * scale}px`,
-                        imageRendering: "auto",
-                        userSelect: "none",
-                    });
-                    loadTile(img, layer, tileZoom, tx, ty, seq);
-                    div.appendChild(img);
-                }
+    function currentView() {
+        // Mapy's 3D view is a separate engine; the 2D one collapses its canvas
+        // meanwhile. A flat heatmap can't follow a perspective globe, so hide it.
+        const wasmCanvas = document.getElementById("wasm-canvas");
+        if (wasmCanvas) {
+            const r = wasmCanvas.getBoundingClientRect();
+            if (!(r.width > 0 && r.height > 0)) {
+                return { hidden: true };
             }
         }
-    }
-
-    function stateKey(state) {
+        if (liveCamera && Date.now() - liveCameraAt < LIVE_CAMERA_STALE_MS) {
+            return liveCamera;
+        }
+        const state = parseMapyState();
+        if (!state) {
+            return null;
+        }
         const rect = getMapViewportRect();
-        return [
-            state.zoom.toFixed(4),
-            state.lat.toFixed(6),
-            state.lon.toFixed(6),
-            Math.round(rect.width),
-            Math.round(rect.height),
-            Math.round(rect.left),
-            Math.round(rect.top),
-            masterOff ? "1" : "0",
-            globalSport,
-            globalOn ? "1" : "0",
-            personalOn ? "1" : "0",
-            opacity,
-            athleteId,
-        ].join("|");
+        return {
+            lon: state.lon,
+            lat: state.lat,
+            zoom: state.zoom,
+            rot: 0,
+            tilt: 0,
+            cx: rect.left + rect.width / 2,
+            cy: rect.top + rect.height / 2,
+            left: rect.left,
+            top: rect.top,
+            width: rect.width,
+            height: rect.height,
+        };
     }
 
     function render() {
-        const state = parseMapyState();
         ensureElements();
-        const layers = state ? getActiveLayers() : [];
-        if (layers.length === 0) {
+        const raw = currentView();
+        const active = raw ? getActiveLayers() : [];
+        if (active.length === 0) {
             // Nothing active (e.g. A turned both off): hide + free old tiles.
-            if (overlayRoot) {
-                overlayRoot.style.display = "none";
-            }
-            clearLayers();
-            lastStateKey = "";
+            overlayRoot.style.display = "none";
+            resetTiles();
             return;
         }
+        if (raw.hidden || raw.tilt > MAX_TILT_DEG || !(raw.width > 0) || !(raw.height > 0)) {
+            overlayRoot.style.display = "none"; // keep the tiles for when it's flat again
+            return;
+        }
+        const view = Object.assign({}, raw, { zoom: clamp(raw.zoom, MIN_ZOOM, MAX_ZOOM) });
         overlayRoot.style.display = "block";
         overlayRoot.style.opacity = String(clamp(opacity / 100, 0, 1));
-        const key = stateKey(state);
-        if (key === lastStateKey) {
-            return;
+        overlayRoot.style.left = `${view.left}px`;
+        overlayRoot.style.top = `${view.top}px`;
+        overlayRoot.style.width = `${view.width}px`;
+        overlayRoot.style.height = `${view.height}px`;
+        for (const kind of ["global", "personal"]) {
+            const layer = tileLayers[kind];
+            if (active.some((l) => l.kind === kind)) {
+                updateTileLayer(layer, view);
+            } else if (layer.levels.size) {
+                resetTileLayer(layer);
+            }
         }
-        lastStateKey = key;
-        drawTiles(state);
     }
 
     function requestRender() {
@@ -837,7 +1160,6 @@
         }
         globalSport = sport;
         lsSet("globalSport", globalSport);
-        lastStateKey = "";
         renderPanel();
         requestRender();
     }
@@ -851,7 +1173,6 @@
         }
         lsSet("globalOn", globalOn ? "1" : "0");
         lsSet("masterOff", masterOff ? "1" : "0");
-        lastStateKey = "";
         renderPanel();
         requestRender();
     }
@@ -865,7 +1186,6 @@
         }
         lsSet("personalOn", personalOn ? "1" : "0");
         lsSet("masterOff", masterOff ? "1" : "0");
-        lastStateKey = "";
         if (personalOn && !athleteId) {
             toast("Personal heatmap: log in to Strava (Subscriber) and reload to enable.");
         }
@@ -876,7 +1196,6 @@
     function masterToggle() {
         masterOff = !masterOff;
         lsSet("masterOff", masterOff ? "1" : "0");
-        lastStateKey = "";
         renderPanel();
         requestRender();
     }
@@ -1173,19 +1492,11 @@
     }
 
     // ---- Observers + hotkeys -------------------------------------------------
+    // Camera moves arrive from mapy-hook.js ("msh-camera"). These only drive the
+    // URL fallback and layout changes. (Patching history.pushState from here
+    // never worked: a content script's `window` is its own isolated copy, so
+    // Mapy's calls didn't go through the patch.)
     function installObservers() {
-        const op = window.history.pushState;
-        const or = window.history.replaceState;
-        window.history.pushState = function (...a) {
-            const out = op.apply(this, a);
-            requestRender();
-            return out;
-        };
-        window.history.replaceState = function (...a) {
-            const out = or.apply(this, a);
-            requestRender();
-            return out;
-        };
         window.addEventListener("popstate", requestRender);
         window.addEventListener("hashchange", requestRender);
         window.addEventListener("resize", requestRender);
