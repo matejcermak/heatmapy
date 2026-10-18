@@ -34,7 +34,8 @@
 **Detailed description**:
 > Plan routes on Mapy.com with Strava's heat on top of the map.
 >
-> • Global heatmap, split by sport — switch between Road, MTB, Gravel, and Run.
+> • Global heatmap, split by sport — switch between Road, MTB, Gravel, Run, and
+>   Trail Run.
 > • Your personal heatmap in blue, on top of the global heat — toggle each layer
 >   independently, so you can spot the roads and trails you haven't done yet.
 > • Sync to Strava — save your planned Mapy route to your Strava account in one
@@ -60,16 +61,40 @@
 
 ## Firefox (AMO) — the extra bits
 
-Account: <https://addons.mozilla.org/developers/> (free). Upload
-`heatmapy-firefox.zip`; the same listing copy above works.
+Account: <https://addons.mozilla.org/developers/> (free, Mozilla account).
+
+The AMO listing lives in `store-assets/amo-metadata.json`: slug `heatmapy`, summary,
+description, category, homepage, "some features may require payment" (Strava
+subscription), MIT license and the notes to reviewers. Two ways to submit:
+
+- **One command (recommended, and the same command ships every later update):**
+  create API credentials at <https://addons.mozilla.org/developers/addon/api/key/>,
+  then:
+  ```bash
+  WEB_EXT_API_KEY=user:… WEB_EXT_API_SECRET=… npm run sign:firefox
+  ```
+  It builds `dist/firefox`, uploads it to the listed channel with the metadata, and
+  returns without waiting for review.
+- **Web form:** Developer Hub → *Submit a New Add-on* → *On this site* → upload
+  `heatmapy-firefox.zip` → "uses a minifier/bundler?" **No** → copy the fields
+  from `amo-metadata.json` (`approval_notes` goes in *Notes to Reviewer*).
+
+After the first submission, in the Developer Hub listing:
+
+1. **Images**: upload the three `store-assets/screenshot-*.png` (1280×800).
+2. **Privacy policy**: paste `PRIVACY.md` (the API can't set it).
+3. Once approved: point `FIREFOX_URL` in `site/index.html` at
+   <https://addons.mozilla.org/firefox/addon/heatmapy/> and replace the README's
+   "until the AMO listing is up" section with the store link.
+
+Notes:
 
 - **Run the linter first**: `npm run lint:firefox`. Expect **0 errors**; the 4
   `UNSAFE_VAR_ASSIGNMENT` warnings are static `innerHTML` templates built from
   extension constants only (no page or user data) — reviewers accept these, but
   they'll ask if you interpolate anything dynamic later.
-- **Add-on id** — `heatmapy@matejcermak.github.io`, in `scripts/build.mjs`. Change
-  it *before* the first upload if you'd rather use another domain: it's permanent
-  once AMO has it.
+- **Add-on id** — `heatmapy@heatmapy.com`, in `scripts/build.mjs`. Permanent once
+  AMO has it.
 - **`strict_min_version: 128.0`** — required, not cosmetic. `mapy-hook.js` relies on
   `content_scripts` `"world": "MAIN"`, which Firefox only supports from 128.
 - **Data collection disclosure** — declared as `"none"` in

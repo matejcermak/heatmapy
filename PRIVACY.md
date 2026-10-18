@@ -1,6 +1,6 @@
 # Privacy Policy — Strava Heatmap for Mapy.com
 
-_Last updated: 2026-06-25_
+_Last updated: 2026-10-18_
 
 This browser extension (Chrome and Firefox) overlays your Strava heatmaps on
 Mapy.com. It is designed to keep your data on your own machine.
@@ -49,6 +49,10 @@ Mapy.com. It is designed to keep your data on your own machine.
   except to Strava itself.
 - `storage`, `unlimitedStorage` — to keep your settings, athlete ID, and the
   local tile cache.
+- `webRequest`, `webRequestBlocking` (Firefox only) — Firefox doesn't send your
+  Strava cookies with the extension's own requests to Strava, so the extension adds
+  them back to those requests only. It doesn't touch the pages you browse or any
+  other site.
 
 ## Contact
 

@@ -10,7 +10,8 @@
     "build:firefox": "node scripts/build.mjs firefox",
     "zip": "npm run build && cd dist/chrome && zip -qr ../../heatmapy-chrome.zip ./* && cd ../firefox && zip -qr ../../heatmapy-firefox.zip ./* && echo 'wrote heatmapy-chrome.zip + heatmapy-firefox.zip'",
     "lint:firefox": "npm run build:firefox && npx --yes web-ext@8 lint --source-dir dist/firefox",
-    "start:firefox": "npm run build:firefox && npx --yes web-ext@8 run --source-dir dist/firefox --start-url https://mapy.com/"
+    "start:firefox": "npm run build:firefox && npx --yes web-ext@8 run --source-dir dist/firefox --start-url https://mapy.com/",
+    "sign:firefox": "npm run build:firefox && npx --yes web-ext@8 sign --channel listed --source-dir dist/firefox --amo-metadata extension/store-assets/amo-metadata.json --approval-timeout 0"
   },
   "author": "Matěj Čermák",
   "license": "MIT"
