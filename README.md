@@ -11,6 +11,7 @@ account in one click (always private and starred). From there it flows to your
 
 **[🌐 heatmapy.com](https://heatmapy.com)** &nbsp;·&nbsp;
 **[🧩 Get it on the Chrome Web Store](https://chromewebstore.google.com/detail/pkifpafiblikmgkcpkbdjmoapjnladok)** &nbsp;·&nbsp;
+**[🦊 Get it on Firefox Add-ons](https://addons.mozilla.org/firefox/addon/heatmapy/)** &nbsp;·&nbsp;
 **[☕ Buy me a coffee](https://donate.stripe.com/5kQ5kD6bo4oV83UcCd5J600)**
 
 ![Demo](assets/demo.gif)
@@ -46,9 +47,9 @@ profile URL).
 
 ### Firefox
 
-Heatmapy runs on **Firefox 128+** (that's when Firefox gained the `MAIN`-world
-content scripts the Mapy route hook needs). Until the AMO listing is up, install it
-from source:
+**[➡️ Install Heatmapy from Firefox Add-ons](https://addons.mozilla.org/firefox/addon/heatmapy/)**
+(Firefox 128+, when Firefox gained the `MAIN`-world content scripts the Mapy route
+hook needs). To run it from source instead:
 
 ```bash
 npm run build:firefox        # → dist/firefox
