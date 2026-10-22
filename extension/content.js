@@ -43,7 +43,7 @@
     // ---- State ---------------------------------------------------------------
     let masterOff = false; // A: mute everything (the per-layer states are remembered)
     let globalSport = "mtb"; // shared discipline: "mtb" | "gravel" | "ride" | "run" (S cycles)
-    let globalOn = true; // G: global heatmap layer on/off (independent)
+    let globalOn = true; // D: global heatmap layer on/off (independent)
     let personalOn = false; // F: personal heatmap layer on/off (independent)
     let opacity = 100;
     let panelMin = false; // panel collapsed to just its title row
@@ -1206,6 +1206,17 @@
         renderPanel();
         requestRender();
     }
+    // "G" — flip Mapy's base map between aerial and the map you were on (outdoor), by
+    // pressing Mapy's own "Aerial" control. A plain click on the host element is enough;
+    // match on its class, since the aria-label is translated ("Aerial" / "Letecká").
+    function toggleAerial() {
+        const btn = document.querySelector("mapy-map-toggle.map-controls__ophoto");
+        if (btn) {
+            btn.click();
+        } else {
+            toast("Couldn't find Mapy's Aerial button.");
+        }
+    }
     // "A" = master mute: hide every layer (per-layer choices remembered) or restore them.
     function masterToggle() {
         masterOff = !masterOff;
@@ -1549,6 +1560,9 @@
                 } else if (key === "f") {
                     event.preventDefault();
                     togglePersonal();
+                } else if (key === "g") {
+                    event.preventDefault();
+                    toggleAerial();
                 } else if (event.key === "[") {
                     event.preventDefault();
                     setOpacity(opacity - 10);

@@ -110,7 +110,7 @@ The global and personal layers toggle **independently**, so you can show your
 personal heat on its own, the global heat on its own, both, or neither.
 
 Keyboard: `A` all on/off · `S` cycle sport · `D` global · `F` personal ·
-`[` / `]` opacity. When planning a route, **⌘-click (Mac) / Ctrl-click (PC)** the
+`G` aerial / outdoor map · `[` / `]` opacity. When planning a route, **⌘-click (Mac) / Ctrl-click (PC)** the
 map to add a point.
 
 ## Getting a planned route onto your Garmin / Wahoo
