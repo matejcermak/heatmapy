@@ -4,3 +4,4 @@
 node_modules/
 dist/
 web-ext-artifacts/
+.claude/
