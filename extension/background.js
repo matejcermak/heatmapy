@@ -197,6 +197,15 @@ function b64urlDecode(s) {
     return atob(str);
 }
 
+function jwtPayload(value) {
+    try {
+        const parts = String(value || "").split(".");
+        return parts.length >= 2 ? JSON.parse(b64urlDecode(parts[1])) : null;
+    } catch (_) {
+        return null;
+    }
+}
+
 // The reliable source: Strava's `_strava_idcf` cookie is a JWT whose payload
 // holds the logged-in athlete id. (Scraping a page can match the WRONG athlete.)
 async function athleteIdFromCookie() {
@@ -207,11 +216,9 @@ async function athleteIdFromCookie() {
             query.storeId = storeId; // the login may live in a container jar
         }
         const c = await api.cookies.get(query);
-        if (c && c.value && c.value.split(".").length >= 2) {
-            const payload = JSON.parse(b64urlDecode(c.value.split(".")[1]));
-            if (payload && payload.athleteId) {
-                return String(payload.athleteId);
-            }
+        const payload = c && jwtPayload(c.value);
+        if (payload && payload.athleteId) {
+            return String(payload.athleteId);
         }
     } catch (_) {
         // ignore
@@ -283,6 +290,197 @@ async function detectAthlete() {
     const loggedIn = await isStravaAuthenticated();
     console.warn("[msh] athlete id not detected; authenticated to strava:", loggedIn);
     return { ok: false, loggedIn };
+}
+
+// ---- Heatmap access gate -----------------------------------------------------
+// The heatmap only runs with the full Strava experience behind it: a logged-in
+// session AND the CloudFront signed cookies that authorize the tile CDN, which
+// Strava hands out when its own heatmap page loads. Without them the tile CDN
+// serves at best a low-zoom subset, so rather than show that limited heat, the
+// content script hides the overlay and shows a notice until both are present.
+//
+// Result: { ok: true } or { ok: false, reason } with reason one of
+//   "permission" — Firefox: the strava.com host permission was revoked
+//   "login"      — not logged in to Strava in this browser
+//   "cookies"    — logged in, but the heatmap cookies are missing, expired, or
+//                  the tile CDN refuses them (see markHeatmapDenied)
+// The latest result is mirrored to storage.local[ACCESS_KEY] so every open Mapy
+// tab flips the moment the user logs in on strava.com in another tab.
+const ACCESS_KEY = "heatmapAccess";
+const DENIED_KEY = "heatmapDeniedTile";
+const STRAVA_TILE_URL = /^https:\/\/[a-z0-9-]+\.strava\.com\//;
+const CF_SIGNATURE = "CloudFront-Signature";
+const CF_KEY_PAIR = "CloudFront-Key-Pair-Id";
+// Cookie changes that can flip the result. Strava touches plenty of others
+// (analytics etc.) on every page view; those don't need a re-check.
+const ACCESS_COOKIES = [
+    "_strava_idcf",
+    "_strava4_session",
+    CF_SIGNATURE,
+    CF_KEY_PAIR,
+    "CloudFront-Policy",
+    "CloudFront-Expires",
+];
+
+async function stravaCookieJar() {
+    try {
+        const storeId = await stravaStoreId();
+        // `domain` matches strava.com and every subdomain, whatever the path —
+        // the CloudFront cookies may be scoped to the tile host, not www.
+        return await api.cookies.getAll(
+            storeId ? { domain: "strava.com", storeId } : { domain: "strava.com" }
+        );
+    } catch (_) {
+        return [];
+    }
+}
+
+// CloudFront's cookie flavour of base64: + -> -, = -> _, / -> ~.
+function cloudFrontPolicyExpiry(value) {
+    try {
+        const json = atob(String(value).replace(/-/g, "+").replace(/_/g, "=").replace(/~/g, "/"));
+        const statements = JSON.parse(json).Statement || [];
+        let latest = 0;
+        for (const s of statements) {
+            const t = Number(s && s.Condition && s.Condition.DateLessThan &&
+                s.Condition.DateLessThan["AWS:EpochTime"]);
+            if (t > latest) {
+                latest = t;
+            }
+        }
+        return latest * 1000; // 0 = unknown
+    } catch (_) {
+        return 0;
+    }
+}
+
+// The cookie's own expiry usually covers it, but the signed policy is what the
+// CDN actually enforces — trust whichever ends first.
+function heatmapCookiesExpired(jar, now) {
+    for (const c of jar) {
+        let until = 0;
+        if (c.name === "CloudFront-Policy") {
+            until = cloudFrontPolicyExpiry(c.value);
+        } else if (c.name === "CloudFront-Expires") {
+            until = Number(c.value) * 1000 || 0;
+        }
+        if (until && until < now) {
+            return true;
+        }
+    }
+    return false;
+}
+
+async function isLoggedIn(jar) {
+    const idcf = jar.find((c) => c.name === "_strava_idcf");
+    const payload = idcf && jwtPayload(idcf.value);
+    if (payload && !(payload.exp && payload.exp * 1000 < Date.now())) {
+        return true;
+    }
+    // No (or a stale) id cookie: ask Strava itself before calling it a logout —
+    // it may have just not re-issued the cookie yet, or renamed it.
+    return await isStravaAuthenticated();
+}
+
+async function computeHeatmapAccess() {
+    if (!(await hasStravaPermission())) {
+        return { ok: false, reason: "permission" };
+    }
+    const jar = await stravaCookieJar();
+    if (!(await isLoggedIn(jar))) {
+        return { ok: false, reason: "login" };
+    }
+    const hasCookies =
+        jar.some((c) => c.name === CF_SIGNATURE) && jar.some((c) => c.name === CF_KEY_PAIR);
+    if (!hasCookies || heatmapCookiesExpired(jar, Date.now())) {
+        return { ok: false, reason: "cookies" };
+    }
+    // The cookies look right, but a tile was refused with them earlier: the gate
+    // only reopens once that very tile loads — i.e. the login really works.
+    let denied = "";
+    try {
+        denied = (await api.storage.local.get(DENIED_KEY))[DENIED_KEY] || "";
+    } catch (_) {
+        // treat as not denied
+    }
+    if (denied) {
+        const probe = await fetchTile(denied);
+        // 401/403 = still refused; 0 = offline/unreachable, can't tell yet.
+        if (!probe.ok && (probe.status === 401 || probe.status === 403 || probe.status === 0)) {
+            return { ok: false, reason: "cookies" };
+        }
+        try {
+            await api.storage.local.remove(DENIED_KEY);
+        } catch (_) {
+            // ignore
+        }
+    }
+    return { ok: true };
+}
+
+const accessKey = (a) => (a ? (a.ok ? "ok" : a.reason || "?") : "");
+
+async function refreshHeatmapAccess() {
+    return await publishAccess(await computeHeatmapAccess());
+}
+
+async function publishAccess(access) {
+    // Compare against the stored copy, not a variable: Chrome's service worker
+    // is torn down between events, but storage survives.
+    let prev = null;
+    try {
+        prev = (await api.storage.local.get(ACCESS_KEY))[ACCESS_KEY] || null;
+    } catch (_) {
+        // treat as unknown
+    }
+    if (accessKey(access) !== accessKey(prev)) {
+        console.log("[msh] heatmap access:", accessKey(access));
+        try {
+            await api.storage.local.set({ [ACCESS_KEY]: access });
+        } catch (_) {
+            // tabs still get the direct reply
+        }
+        if (access.ok) {
+            detectAthlete(); // just logged in: personal heat can start right away
+        }
+    }
+    return access;
+}
+
+// The tile CDN refused a global tile although the login cookies looked fine, so
+// they don't actually work for the heatmap. Keep that tile as the probe: every
+// re-check (cookie change, tab focus, A back on) retries it, and the gate stays
+// shut until it loads — i.e. until the user has really logged in on strava.com.
+// The tile URL (sport/zoom/x/y) is all that's stored; no cookie values.
+async function markHeatmapDenied(url) {
+    if (typeof url !== "string" || !STRAVA_TILE_URL.test(url)) {
+        return await refreshHeatmapAccess();
+    }
+    try {
+        await api.storage.local.set({ [DENIED_KEY]: url });
+    } catch (_) {
+        // ignore — this tab still gets the reply below
+    }
+    // It was refused a moment ago: no need to probe it again right now.
+    return await publishAccess({ ok: false, reason: "cookies" });
+}
+
+// Logging in / opening the Strava heatmap in another tab changes these cookies:
+// re-check (debounced — a login sets several at once) and broadcast the result.
+let accessTimer = null;
+if (api.cookies && api.cookies.onChanged) {
+    api.cookies.onChanged.addListener((info) => {
+        const c = info && info.cookie;
+        if (!c || !ACCESS_COOKIES.includes(c.name) || !/(^|\.)strava\.com$/.test(c.domain || "")) {
+            return;
+        }
+        storeIdCachedAt = 0; // the login may have landed in another container
+        clearTimeout(accessTimer);
+        accessTimer = setTimeout(() => {
+            accessTimer = null;
+            refreshHeatmapAccess();
+        }, 400);
+    });
 }
 
 // ---- Send a planned route to Strava (the user's own session) -------------
@@ -516,6 +714,14 @@ api.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
         detectAthlete().then(sendResponse);
         return true; // async
     }
+    if (msg.type === "checkHeatmapAccess") {
+        refreshHeatmapAccess().then(sendResponse);
+        return true; // async
+    }
+    if (msg.type === "heatmapDenied") {
+        markHeatmapDenied(msg.url).then(sendResponse);
+        return true; // async
+    }
     if (msg.type === "uploadStravaRoute" && typeof msg.gpx === "string") {
         uploadStravaRoute(msg.gpx, msg.name, msg.sport).then(sendResponse);
         return true; // async
@@ -524,9 +730,21 @@ api.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
 });
 
 // Kick off detection on install/startup so personal heat is ready when possible.
-api.runtime.onInstalled.addListener(() => detectAthlete());
-api.runtime.onStartup.addListener(() => detectAthlete());
-// Firefox: the user can grant strava.com access after install — retry then.
+api.runtime.onInstalled.addListener(() => {
+    detectAthlete();
+    refreshHeatmapAccess();
+});
+api.runtime.onStartup.addListener(() => {
+    detectAthlete();
+    refreshHeatmapAccess();
+});
+// Firefox: the user can grant (or revoke) strava.com access at any time.
 if (api.permissions && api.permissions.onAdded) {
-    api.permissions.onAdded.addListener(() => detectAthlete());
+    api.permissions.onAdded.addListener(() => {
+        detectAthlete();
+        refreshHeatmapAccess();
+    });
+}
+if (api.permissions && api.permissions.onRemoved) {
+    api.permissions.onRemoved.addListener(() => refreshHeatmapAccess());
 }

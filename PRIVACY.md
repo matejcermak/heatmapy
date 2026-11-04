@@ -1,6 +1,6 @@
 # Privacy Policy — Strava Heatmap for Mapy.com
 
-_Last updated: 2026-10-18_
+_Last updated: 2026-11-04_
 
 This browser extension (Chrome and Firefox) overlays your Strava heatmaps on
 Mapy.com. It is designed to keep your data on your own machine.
@@ -26,8 +26,10 @@ Mapy.com. It is designed to keep your data on your own machine.
 ## What it stores (locally, on your device only)
 
 - Your settings (which layers are on, opacity) — in the page's local storage.
-- Your athlete ID — in the extension's own local storage (the WebExtension
-  `storage.local` area).
+- Your athlete ID and whether your Strava login currently works for the heatmap —
+  in the extension's own local storage (the WebExtension `storage.local` area). If
+  Strava refuses a heatmap tile, that one tile's address is kept there too, so the
+  extension can retry it to tell when your login works again; never any cookie values.
 - A cache of heatmap image tiles — in your browser's IndexedDB, to make the map
   fast and reduce repeated requests. You can clear it any time via the browser.
 
@@ -45,8 +47,9 @@ Mapy.com. It is designed to keep your data on your own machine.
 - `host_permissions: *://*.strava.com/*` — to fetch your heatmap tiles, and to save
   a planned route to your own Strava account, using your logged-in session.
 - `cookies` — to read your Strava athlete ID from your existing Strava login cookie
-  (for the personal heatmap and route saving). Your cookies are not sent anywhere
-  except to Strava itself.
+  (for the personal heatmap and route saving), and to check that you're logged in
+  to Strava with its heatmap cookies loaded before showing the heatmap. Your cookies
+  are not sent anywhere except to Strava itself.
 - `storage`, `unlimitedStorage` — to keep your settings, athlete ID, and the
   local tile cache.
 - `webRequest`, `webRequestBlocking` (Firefox only) — Firefox doesn't send your

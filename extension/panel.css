@@ -441,6 +441,25 @@
     color: #fff;
 }
 
+#msh-login-banner .msh-login-banner__off {
+    display: block;
+    margin-top: 10px;
+    color: #aaa;
+    font-size: 12px;
+}
+
+#msh-login-banner .msh-key {
+    display: inline-block;
+    min-width: 18px;
+    padding: 0 4px;
+    border: 1px solid rgba(255, 255, 255, 0.30);
+    border-radius: 5px;
+    box-shadow: inset 0 -1px 0 rgba(0, 0, 0, 0.35);
+    color: #fff;
+    font: 700 11px/16px ui-monospace, SFMono-Regular, Menlo, monospace;
+    text-align: center;
+}
+
 /* Higher specificity than the base .msh-toast (which sets pointer-events:none
    and is declared later in this file) so the link is actually clickable. */
 .msh-toast.msh-toast--link {
