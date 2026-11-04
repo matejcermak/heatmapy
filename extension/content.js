@@ -48,6 +48,9 @@
     let opacity = 100;
     let panelMin = false; // panel collapsed to just its title row
     let athleteId = "";
+    // Strava access as last reported by the background worker:
+    // null = not checked yet, else { ok, reason: "" | "login" | "cookies" | "permission" }.
+    let access = null;
 
     let overlayRoot = null;
     let panelRoot = null;
@@ -340,91 +343,143 @@
 
     // ---- Tile fetch (via service worker, with Strava cookies) ----------------
     const STRAVA_HEATMAP_URL = "https://www.strava.com/maps/global-heatmap";
-    // Tile 401/403s mean two different things, and they need different UI
-    // (issues #2, #7 — a 9s toast was easy to miss, and with no Strava login
-    // the extension looked simply broken):
-    //  - no login at all -> NOTHING loads; show a persistent banner that stays
-    //    until a tile actually loads (cleared in loadTile), with retries on
-    //    tab focus so it disappears by itself right after the user logs in;
-    //  - logged in without a subscription -> only detail past ~2 km scale and
-    //    the personal heat are gated; a throttled transient toast is enough.
-    let loginBanner = null;
-    let subNotifiedAt = 0;
-    // kind/z disambiguate a stored athleteId whose session has expired: a free
-    // logged-in account CAN load global tiles at z<=11, so a global 401/403
-    // there means the login itself is gone -> banner, not the sub toast.
-    function noteAuthFailure(kind, z) {
-        if (athleteId && (kind === "personal" || z > 11)) {
-            const now = Date.now();
-            if (now - subNotifiedAt < 60000) {
-                return;
-            }
-            subNotifiedAt = now;
-            toast(
-                "Heatmap detail past ~2 km map scale (and the personal heatmap) " +
-                "needs a Strava subscription — zoom out to keep the free global heat."
-            );
+
+    // ---- Strava access gate + login notice -----------------------------------
+    // No limited mode: the heatmap renders only once the background worker has
+    // confirmed a Strava login AND the heatmap's CloudFront cookies, which Strava
+    // sets when its own heatmap page loads. Until then nothing is fetched and a
+    // notice at the top of the map says what to do. The notice follows the A
+    // switch: shown whenever Heatmapy is on and access is missing, gone the
+    // moment it's turned off, back when it's turned on again — so turning it off
+    // is how you use Mapy undisturbed. (Issues #2, #7: a toast was easy to miss.)
+    // The worker re-checks whenever Strava's cookies change and broadcasts the
+    // result, so the notice clears by itself right after logging in elsewhere.
+    function applyAccess(next) {
+        if (!next || typeof next !== "object") {
             return;
         }
-        showLoginBanner();
+        const ok = !!next.ok;
+        const reason = ok ? "" : String(next.reason || "login");
+        if (access && access.ok === ok && access.reason === reason) {
+            return;
+        }
+        access = { ok, reason };
+        renderPanel(); // also shows / clears the notice
+        requestRender();
     }
-    function showLoginBanner() {
-        if (loginBanner) {
-            return;
+    let accessCheck = null;
+    function checkAccess() {
+        if (accessCheck) {
+            return accessCheck;
         }
-        loginBanner = document.createElement("div");
-        loginBanner.id = "msh-login-banner";
-        loginBanner.innerHTML =
-            '<button class="msh-login-banner__close" ' +
-            'title="Hide and turn Heatmapy off (press A to turn it back on)">×</button>' +
-            "<b>Heatmapy needs a Strava login</b>" +
-            "Log in to Strava in this browser to load the heatmap. A free account " +
-            "shows the global heat down to ~2&nbsp;km map scale; a subscription " +
-            "unlocks full detail and your personal heatmap." +
-            '<br><a href="' + STRAVA_HEATMAP_URL + '" target="_blank" rel="noopener noreferrer">' +
-            "Log in on strava.com ↗</a>";
-        loginBanner.querySelector(".msh-login-banner__close").addEventListener("click", () => {
-            clearLoginBanner();
-            if (!masterOff) {
-                masterToggle(); // dismissing = "not now": stop fetching (and failing)
+        accessCheck = (async () => {
+            try {
+                applyAccess(await api.runtime.sendMessage({ type: "checkHeatmapAccess" }));
+            } catch (_) {
+                // worker unreachable (extension reloaded): leave the state as is
+            } finally {
+                accessCheck = null;
+            }
+        })();
+        return accessCheck;
+    }
+    // Back from the strava.com tab: re-check straight away. The worker's cookie
+    // listener normally got there first; this covers anything it can't see.
+    function recheckAccess() {
+        if (!document.hidden && !masterOff) {
+            checkAccess();
+        }
+    }
+    document.addEventListener("visibilitychange", recheckAccess);
+    window.addEventListener("focus", recheckAccess);
+    try {
+        api.storage.onChanged.addListener((changes, area) => {
+            if (area === "local" && changes.heatmapAccess && changes.heatmapAccess.newValue) {
+                applyAccess(changes.heatmapAccess.newValue);
             }
         });
-        document.body.appendChild(loginBanner);
+    } catch (_) {
+        // ignore
     }
-    function clearLoginBanner() {
-        if (loginBanner) {
-            loginBanner.remove();
-            loginBanner = null;
-        }
-    }
-    // The user logs in on strava.com in another tab and comes back: retry the
-    // tiles so the banner clears on its own, no manual reload needed.
-    function retryAfterLogin() {
-        if (loginBanner && !document.hidden) {
-            resetTiles();
-            requestRender();
-        }
-    }
-    document.addEventListener("visibilitychange", retryAfterLogin);
-    window.addEventListener("focus", retryAfterLogin);
-    // Firefox lets the user revoke the strava.com host permission at any time; the
-    // background worker reports that back so we can say what to actually do.
-    let permNotifiedAt = 0;
-    function notePermissionMissing() {
-        const now = Date.now();
-        if (now - permNotifiedAt < 60000) {
+
+    // A global tile that 401/403s although access was confirmed means the Strava
+    // login doesn't actually work for the heatmap (stale cookies, expired
+    // session) — at any zoom. Same answer as no login at all: the notice, not a
+    // toast and not a half-working low-zoom map. The worker keeps the refused
+    // tile and only reopens the gate once that very tile loads.
+    // Personal tiles are left out: they're a subscriber extra, and a refusal
+    // there shouldn't take the global heat down with it — they just don't draw.
+    function noteAuthFailure(kind, url) {
+        if (kind !== "global" || !access || !access.ok) {
             return;
         }
-        permNotifiedAt = now;
-        const el = document.createElement("div");
-        el.className = "msh-toast";
-        el.textContent =
-            "Heatmapy needs permission to access strava.com — click the Heatmapy " +
-            "toolbar icon and grant access, then reload this page.";
-        positionToastAbovePanel(el);
-        document.body.appendChild(el);
-        window.setTimeout(() => el.remove(), 9000);
+        applyAccess({ ok: false, reason: "cookies" });
+        api.runtime.sendMessage({ type: "heatmapDenied", url }).then(applyAccess, () => {});
     }
+
+    const NOTICE_COPY = {
+        login: {
+            title: "Log in to Strava to see the heatmap",
+            body: "Heatmapy shows Strava's heatmap only with you logged in. Open the " +
+                "Strava heatmap in another tab, log in there and let it load — the " +
+                "heat appears here on its own.",
+            link: "Open Strava heatmap ↗",
+        },
+        cookies: {
+            title: "Open the Strava heatmap once",
+            body: "You're logged in, but Strava hasn't loaded its heatmap in this " +
+                "browser yet (or that session expired). Open it in another tab and " +
+                "let it load — the heat appears here on its own.",
+            link: "Open Strava heatmap ↗",
+        },
+        permission: {
+            title: "Heatmapy needs access to strava.com",
+            body: "Click the Heatmapy toolbar icon and choose Grant access — the " +
+                "heatmap can't load without it.",
+            link: "",
+        },
+    };
+    let loginBanner = null;
+    function updateNotice() {
+        const reason = !masterOff && access && !access.ok ? access.reason : "";
+        if (!reason) {
+            if (loginBanner) {
+                loginBanner.remove();
+                loginBanner = null;
+            }
+            return;
+        }
+        if (loginBanner && loginBanner.dataset.reason === reason) {
+            return;
+        }
+        const copy = NOTICE_COPY[reason] || NOTICE_COPY.login;
+        if (!loginBanner) {
+            loginBanner = document.createElement("div");
+            loginBanner.id = "msh-login-banner";
+            loginBanner.setAttribute("role", "status");
+            document.body.appendChild(loginBanner);
+        }
+        loginBanner.dataset.reason = reason;
+        loginBanner.innerHTML =
+            '<button class="msh-login-banner__close" ' +
+            'title="Turn Heatmapy off (press A to turn it back on)" ' +
+            'aria-label="Turn Heatmapy off">×</button>' +
+            "<b>" + copy.title + "</b>" +
+            copy.body +
+            (copy.link
+                ? '<br><a href="' + STRAVA_HEATMAP_URL + '" target="_blank" rel="noopener noreferrer">' +
+                  copy.link + "</a>"
+                : "") +
+            '<span class="msh-login-banner__off">Press <kbd class="msh-key">A</kbd> ' +
+            "to turn Heatmapy off and use Mapy without it.</span>";
+        // × = "not now": the same as A — no heat, no notice, until it's back on.
+        loginBanner.querySelector(".msh-login-banner__close").addEventListener("click", () => {
+            if (!masterOff) {
+                masterToggle();
+            }
+        });
+    }
+
     async function fetchTileViaSW(url) {
         let resp;
         try {
@@ -436,7 +491,7 @@
             return { ok: false, status: 0 };
         }
         if (resp.needPermission) {
-            notePermissionMissing();
+            applyAccess({ ok: false, reason: "permission" }); // revoked mid-session
             return { ok: false, status: 0 };
         }
         if (resp.ok && resp.dataUrl) {
@@ -627,7 +682,7 @@
     }
     // Resolves to an objectURL, EMPTY_TILE, or "" (failed — nothing to draw).
     async function loadTileData(job) {
-        const { url, kind, z } = job;
+        const { url, kind } = job;
         if (kind === "global") {
             const hit = await idbGet(url);
             if (
@@ -648,13 +703,10 @@
             const res = await fetchTileViaSW(url);
             if (!res.ok || !res.blob) {
                 if (res.status === 401 || res.status === 403) {
-                    noteAuthFailure(kind, z);
+                    noteAuthFailure(kind, url);
                 }
                 return "";
             }
-            // A tile came back over the network -> the Strava session works
-            // (logged out, every tile 403s), so the login nag is done.
-            clearLoginBanner();
             if (kind === "personal") {
                 return await recolorToBlue(res.blob);
             }
@@ -940,7 +992,8 @@
     }
 
     function getActiveLayers() {
-        if (masterOff) {
+        // Off, or no confirmed Strava access yet: render (and fetch) nothing.
+        if (masterOff || !access || !access.ok) {
             return [];
         }
         const layers = [];
@@ -1123,6 +1176,8 @@
     }
 
     function renderPanel() {
+        // Every on/off and access change ends up here, so the notice follows them.
+        updateNotice();
         if (!panelRoot) {
             return;
         }
@@ -1155,10 +1210,7 @@
             slider.value = String(opacity);
         }
         if (hint) {
-            const login = athleteId
-                ? ""
-                : '<a href="' + STRAVA_HEATMAP_URL + '" target="_blank" rel="noopener">Log in to Strava ↗</a> to enable personal · ';
-            hint.innerHTML = login + ADD_POINT_HINT;
+            hint.textContent = ADD_POINT_HINT; // logging in is the top notice's job
         }
     }
 
@@ -1200,8 +1252,8 @@
         }
         lsSet("personalOn", personalOn ? "1" : "0");
         lsSet("masterOff", masterOff ? "1" : "0");
-        if (personalOn && !athleteId) {
-            toast("Personal heatmap: log in to Strava (Subscriber) and reload to enable.");
+        if (personalOn && !athleteId && access && access.ok) {
+            toast("Personal heatmap: couldn't find your Strava athlete ID — set it in the Heatmapy toolbar popup.");
         }
         renderPanel();
         requestRender();
@@ -1223,6 +1275,9 @@
         lsSet("masterOff", masterOff ? "1" : "0");
         renderPanel();
         requestRender();
+        if (!masterOff) {
+            checkAccess(); // back on: the login state may have moved meanwhile
+        }
     }
     // Collapse the panel to its title row (logo + master toggle) so it stays out
     // of the way while browsing; the layers keep rendering — issue #9.
@@ -1579,4 +1634,5 @@
     installObservers();
     installHotkeys();
     requestRender();
+    checkAccess();
 })();

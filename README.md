@@ -28,10 +28,15 @@ ones you still haven't explored. That's the whole point of planning. Per-sport
 **MTB / Gravel / Road / Run / Trail Run** layers mean it's not just for cyclists. And Mapy.com's
 outdoor + aerial maps and route planner beat the usual map apps for this.
 
-You need to be **logged in to Strava** in the same browser. A **Strava Subscription**
-is required for the global heatmap above zoom 11, your **personal heatmap**, and
-**Sync to Strava** (saving a planned route to your account). The low-zoom global
-heatmap, route planning, and the plain GPX download work on a free account.
+You need to be **logged in to Strava** in the same browser, with Strava's own
+[global heatmap](https://www.strava.com/maps/global-heatmap) opened once — that's
+what loads the cookies the heatmap tiles need. Until both are in place Heatmapy shows
+no heat at all, just a notice at the top of the map with a link to do it; the heat
+appears on its own once you're in. Press `A` (or the notice's ×) to turn Heatmapy off
+and use Mapy without it. A **Strava Subscription** is required for the global heatmap
+above zoom 11, your **personal heatmap**, and **Sync to Strava** (saving a planned
+route to your account). The low-zoom global heatmap, route planning, and the plain
+GPX download work on a free account.
 
 ---
 
@@ -41,7 +46,8 @@ heatmap, route planning, and the plain GPX download work on a free account.
 
 **[➡️ Install Heatmapy](https://chromewebstore.google.com/detail/pkifpafiblikmgkcpkbdjmoapjnladok)**,
 pin it, then open [Mapy.com](https://mapy.com). Make sure you're **logged in to
-Strava** in the same browser (open `strava.com` once). Click the extension icon →
+Strava** in the same browser and have opened its
+[heatmap](https://www.strava.com/maps/global-heatmap) once. Click the extension icon →
 it auto-detects your athlete ID (or paste it from your `strava.com/athletes/<id>`
 profile URL).
 
@@ -98,8 +104,9 @@ On-map panel (bottom-left):
 - **Sport** — pick the discipline: **Road / MTB / Gravel / Run / Trail**. Both layers follow it.
 - **Global** — independent on/off for the crowd heatmap.
 - **Personal** — independent on/off for *your* heatmap.
-- **⏻** — master mute: hides everything at once (your per-layer choices are
-  remembered) and brings it all back.
+- **⏻** — master switch: turns Heatmapy off — heat *and* the Strava login
+  notice — so Mapy works as usual (your per-layer choices are remembered), and
+  brings it all back.
 - **Opacity** slider — one control for both layers.
 - **Sync to Strava** — saves your planned Mapy route to your Strava account as a
   Route (**requires a Strava subscription**), always private and starred. From there
@@ -133,6 +140,15 @@ can use the **⬇ GPX download** and import manually instead.)
   can't do credentialed cross-origin fetches in MV3, the worker can. It's a service
   worker in Chrome and an event page in Firefox (which has no MV3 service workers);
   the code is identical, only the manifest key differs.
+- **Access gate:** before fetching a single tile, the worker checks for a Strava
+  login (`_strava_idcf`, falling back to a logged-in-only page) **and** the
+  CloudFront heatmap cookies (`CloudFront-Signature` / `-Key-Pair-Id`, not past
+  their signed policy's expiry). Missing either → no overlay, a top-of-map notice
+  instead (while `A` is on). The worker re-checks on every change to those cookies
+  and mirrors the result to `storage.local.heatmapAccess`, so open Mapy tabs flip
+  the moment you log in elsewhere. If a global tile still comes back 401/403 at any
+  zoom, the notice returns (never a toast or a half-working low-zoom map) and the
+  worker keeps that tile as a probe: the gate reopens only once it actually loads.
 - `content.js` renders two stacked tile layers over Mapy's map, caches global
   tiles in IndexedDB (instant on reopen) and everything in memory, and
   canvas-recolors the personal tiles (Strava serves them as opaque black) to a

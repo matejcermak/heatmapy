@@ -44,7 +44,8 @@
 > • On-map controls plus keyboard shortcuts (A all / S sport / D global / F personal),
 >   opacity, fast tile caching.
 >
-> Requires being logged in to Strava in the same browser. A Strava Subscription is
+> Requires being logged in to Strava in the same browser, with Strava's global
+> heatmap opened once (until then a notice on the map shows how). A Strava Subscription is
 > required for the global heatmap above zoom 11, the personal heatmap, and Sync to
 > Strava (saving a route). Route planning and the plain GPX download work on a free
 > account. The extension only talks to Strava (using your existing login) and stores
