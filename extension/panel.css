@@ -16,6 +16,7 @@
     user-select: none;
     width: 286px;
     box-sizing: border-box;
+    transition: bottom 0.2s ease;
 }
 
 #msh-panel .msh-title {

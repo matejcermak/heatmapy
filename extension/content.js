@@ -1120,6 +1120,7 @@
         slider.value = String(opacity);
         slider.addEventListener("input", (e) => setOpacity(parseInt(e.target.value, 10)));
         renderPanel();
+        layoutPanel();
     }
 
     function renderPanel() {
@@ -1496,18 +1497,80 @@
         }
     }
 
+    // ---- Keep clear of Mapy's elevation profile -------------------------------
+    // Mapy's route elevation profile ("Výškový profil") is a full-width drawer
+    // along the bottom of the map, inside Mapy's controls layer (z 301) — above
+    // the panel. While it's open, lift the panel to just above it. Closed, the
+    // drawer collapses to zero height at the bottom edge, so its rect alone
+    // tells us whether it's open — issue #11.
+    const PANEL_MIN_BOTTOM = 12;
+    const PANEL_GAP = 8;
+    let profileObserver = null;
+    let observedProfile = null;
+
+    function profileDrawerTop() {
+        const drawer = document.querySelector(".mapDrawer__container");
+        if (drawer !== observedProfile) {
+            // Mapy may re-create the drawer; follow its open/close animation.
+            if (profileObserver) {
+                profileObserver.disconnect();
+            }
+            observedProfile = drawer;
+            if (drawer && typeof ResizeObserver === "function") {
+                profileObserver = profileObserver || new ResizeObserver(layoutPanel);
+                profileObserver.observe(drawer);
+            }
+        }
+        if (!drawer) {
+            return null;
+        }
+        const r = drawer.getBoundingClientRect();
+        const p = panelRoot.getBoundingClientRect();
+        if (r.height < 1 || r.top >= window.innerHeight || r.left >= p.right || r.right <= p.left) {
+            return null;
+        }
+        // Mapy moves its scale bar + attribution up to sit on the open drawer;
+        // clear those too.
+        let top = r.top;
+        const scale = document.querySelector(".bottom-left-controls");
+        if (scale) {
+            const s = scale.getBoundingClientRect();
+            if (s.height > 0 && s.left < p.right && s.right > p.left) {
+                top = Math.min(top, s.top);
+            }
+        }
+        return top;
+    }
+
+    function layoutPanel() {
+        if (!panelRoot) {
+            return;
+        }
+        const top = profileDrawerTop();
+        let bottom = "";
+        if (top !== null) {
+            // Never push the panel off the top of a short window; overlapping the
+            // drawer beats losing the panel's top row.
+            const h = panelRoot.offsetHeight || 0;
+            const lifted = window.innerHeight - top + PANEL_GAP;
+            bottom = Math.max(PANEL_MIN_BOTTOM, Math.min(lifted, window.innerHeight - h - PANEL_MIN_BOTTOM)) + "px";
+        }
+        if (panelRoot.style.bottom !== bottom) {
+            panelRoot.style.bottom = bottom; // "" falls back to the stylesheet
+        }
+    }
+
     // ---- Toast ---------------------------------------------------------------
-    // The panel's height is dynamic, so pin the toast just above its actual
-    // height (panel sits at bottom:12px) rather than a fixed offset that the
-    // taller panel would overlap.
+    // The panel's height and position are dynamic, so pin the toast just above
+    // where it actually is rather than a fixed offset the panel would overlap.
     function positionToastAbovePanel(el) {
         const panel = panelRoot || document.getElementById("msh-panel");
         if (!panel) {
             return;
         }
-        const h = panel.getBoundingClientRect().height || panel.offsetHeight || 0;
-        if (h) {
-            el.style.bottom = 48 + h + 8 + "px"; // panel bottom + height + gap
+        const top = panel.getBoundingClientRect().top;
+        if (top) {
+            el.style.bottom = window.innerHeight - top + PANEL_GAP + "px";
         }
     }
     function toast(message) {
@@ -1532,7 +1595,9 @@
         window.addEventListener("popstate", requestRender);
         window.addEventListener("hashchange", requestRender);
         window.addEventListener("resize", requestRender);
+        window.addEventListener("resize", layoutPanel);
         window.setInterval(requestRender, 250);
+        window.setInterval(layoutPanel, 250);
     }
 
     function installHotkeys() {
